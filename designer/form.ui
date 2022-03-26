@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>512</width>
+    <height>327</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Dialog</string>
+  </property>
+  <layout class="QFormLayout" name="formLayout_2">
+   <item row="0" column="0">
+    <widget class="QLabel" name="label_5">
+     <property name="text">
+      <string>Field to search for</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QComboBox" name="searchFieldComboBox"/>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label_6">
+     <property name="text">
+      <string>Field to copy into</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QComboBox" name="copyIntoFieldComboBox"/>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Deck to search</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="label_4">
+     <property name="text">
+      <string>Field to leech from</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="1">
+    <widget class="QComboBox" name="copyFromFieldComboBox"/>
+   </item>
+   <item row="5" column="1">
+    <widget class="QPushButton" name="copyButton">
+     <property name="text">
+      <string>Copy</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1">
+    <widget class="QWidget" name="deckChooser" native="true"/>
+   </item>
+   <item row="4" column="1">
+    <widget class="QSpinBox" name="matchedNotesSpinBox">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QCheckBox" name="matchedNotesLimitCheckBox">
+     <property name="text">
+      <string>Limit matched notes</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>searchFieldComboBox</tabstop>
+  <tabstop>copyIntoFieldComboBox</tabstop>
+  <tabstop>copyFromFieldComboBox</tabstop>
+  <tabstop>matchedNotesLimitCheckBox</tabstop>
+  <tabstop>matchedNotesSpinBox</tabstop>
+  <tabstop>copyButton</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>
