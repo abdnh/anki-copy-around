@@ -7,7 +7,7 @@ from aqt.qt import *
 from aqt.main import AnkiQt
 from aqt.deckchooser import DeckChooser
 from anki.notes import Note
-from anki.collection import SearchNode
+from anki.utils import stripHTML
 
 from .form import Ui_Dialog
 from . import consts
@@ -76,6 +76,13 @@ class CopyAroundDialog(QDialog):
         self.form.copyFromFieldComboBox.clear()
         self.form.copyFromFieldComboBox.addItems(self.dest_fields)
 
+    def _preprocess_search(self, text: str) -> str:
+        text = stripHTML(text)
+        text = text.replace("\\", "\\\\")
+        text = text.replace(":", "\\:")
+        text = text.replace('"', '\\"')
+        return f'"{text}"'
+
     def _process_notes(
         self,
         did: DeckId,
@@ -93,10 +100,8 @@ class CopyAroundDialog(QDialog):
                         value=i + 1,
                     )
                 )
-            search_for = note[search_for_field]
-            query = self.mw.col.build_search_string(
-                f"did:{did}", SearchNode(parsable_text=search_for)
-            )
+            search_for = self._preprocess_search(note[search_for_field])
+            query = self.mw.col.build_search_string(f"did:{did}", search_for)
             nids = self.mw.col.find_notes(query)
             if not nids:
                 continue
