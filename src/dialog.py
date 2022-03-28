@@ -1,5 +1,5 @@
 from concurrent.futures import Future
-from typing import List
+from typing import List, Optional
 
 import anki
 from anki.decks import DeckId
@@ -93,14 +93,14 @@ class CopyAroundDialog(QDialog):
 
         return super().exec()
 
-    def _get_field(self, fields: List[str], key) -> str:
+    def _get_field(self, fields: List[str], key) -> Optional[str]:
         for field in fields:
             if key.lower() == field.lower():
                 return field
         return None
 
     def _update_dest_fields(self, dest_did: DeckId):
-        self.dest_fields = []
+        self.dest_fields: List[str] = []
         for nid in self.mw.col.find_notes(f"did:{dest_did}"):
             note = self.mw.col.get_note(nid)
             for field in note.keys():
