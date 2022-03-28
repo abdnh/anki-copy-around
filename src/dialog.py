@@ -31,6 +31,7 @@ class CopyAroundDialog(QDialog):
     def __init__(self, mw: AnkiQt, parent, notes: List[Note]):
         super().__init__(parent)
         self.mw = mw
+        self.config = mw.addonManager.getConfig(__name__)
         self.notes = notes
         self.setup_ui()
 
@@ -63,8 +64,40 @@ class CopyAroundDialog(QDialog):
                     self.src_fields.append(field)
         self.form.searchFieldComboBox.addItems(self.src_fields)
         self.form.copyIntoFieldComboBox.addItems(self.src_fields)
-        self.form.copyIntoFieldComboBox.setCurrentIndex(1)
         self._update_dest_fields(self.deckChooser.selectedId())
+
+    def exec(self) -> int:
+        copy_from_deck = self.mw.col.decks.by_name(self.config["copy_from_deck"])
+        if copy_from_deck:
+            self.deckChooser.selected_deck_id = copy_from_deck["id"]
+            self._update_dest_fields(copy_from_deck["id"])
+
+        matched_notes_limit = self.config["matched_notes_limit"]
+        if matched_notes_limit > 0:
+            self.form.matchedNotesLimitCheckBox.setChecked(True)
+            self.form.matchedNotesSpinBox.setValue(matched_notes_limit)
+
+        search_field = self.config["search_field"]
+        if search_field := self._get_field(self.src_fields, search_field):
+            self.form.searchFieldComboBox.setCurrentText(search_field)
+
+        copy_into_field = self.config["copy_into_field"]
+        if copy_into_field := self._get_field(self.src_fields, copy_into_field):
+            self.form.copyIntoFieldComboBox.setCurrentText(copy_into_field)
+        else:
+            self.form.copyIntoFieldComboBox.setCurrentIndex(1)
+
+        copy_from_field = self.config["copy_from_field"]
+        if copy_from_field := self._get_field(self.dest_fields, copy_from_field):
+            self.form.copyFromFieldComboBox.setCurrentText(copy_from_field)
+
+        return super().exec()
+
+    def _get_field(self, fields: List[str], key) -> str:
+        for field in fields:
+            if key.lower() == field.lower():
+                return field
+        return None
 
     def _update_dest_fields(self, dest_did: DeckId):
         self.dest_fields = []
@@ -86,7 +119,7 @@ class CopyAroundDialog(QDialog):
     def _process_notes(
         self,
         did: DeckId,
-        search_for_field: str,
+        search_field: str,
         copy_into_field: str,
         copy_from_field: str,
         matched_notes_count: int,
@@ -100,7 +133,7 @@ class CopyAroundDialog(QDialog):
                         value=i + 1,
                     )
                 )
-            search_for = self._preprocess_search(note[search_for_field])
+            search_for = self._preprocess_search(note[search_field])
             query = self.mw.col.build_search_string(f"did:{did}", search_for)
             nids = self.mw.col.find_notes(query)
             if not nids:
@@ -117,19 +150,27 @@ class CopyAroundDialog(QDialog):
             self.updated_notes.append(note)
 
     def on_copy(self):
-        did = self.deckChooser.selectedId()
+        search_field = self.src_fields[self.form.searchFieldComboBox.currentIndex()]
         copy_into_field = self.src_fields[
             self.form.copyIntoFieldComboBox.currentIndex()
         ]
+        did = self.deckChooser.selectedId()
         copy_from_field = self.dest_fields[
             self.form.copyFromFieldComboBox.currentIndex()
         ]
-        search_for_field = self.src_fields[self.form.searchFieldComboBox.currentIndex()]
         matched_notes_count = (
             self.form.matchedNotesSpinBox.value()
             if self.form.matchedNotesLimitCheckBox.isChecked()
             else -1
         )
+
+        # save options
+        self.config["search_field"] = search_field
+        self.config["copy_into_field"] = copy_into_field
+        self.config["copy_from_deck"] = self.mw.col.decks.get(did)["name"]
+        self.config["copy_from_field"] = copy_from_field
+        self.config["matched_notes_limit"] = matched_notes_count
+        self.mw.addonManager.writeConfig(__name__, self.config)
 
         def on_done(fut: Future):
             try:
@@ -147,7 +188,7 @@ class CopyAroundDialog(QDialog):
         self.mw.taskman.run_in_background(
             lambda: self._process_notes(
                 did,
-                search_for_field,
+                search_field,
                 copy_into_field,
                 copy_from_field,
                 matched_notes_count,
