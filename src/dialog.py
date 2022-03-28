@@ -8,7 +8,11 @@ from aqt import qtmajor
 from aqt.main import AnkiQt
 from aqt.deckchooser import DeckChooser
 from anki.notes import Note
-from anki.utils import stripHTML
+
+try:
+    from anki.utils import strip_html as stripHTML
+except:
+    from anki.utils import stripHTML
 
 if qtmajor > 5:
     from .form_qt6 import Ui_Dialog
