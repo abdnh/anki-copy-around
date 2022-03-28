@@ -1,14 +1,17 @@
 .PHONY: all forms zip clean format check prebuild install
 all: zip
 
-forms: src/form.py
+forms: src/form_qt5.py src/form_qt6.py
 
 PACKAGE_NAME := copy_around
 
 zip: forms $(PACKAGE_NAME).ankiaddon
 
-src/form.py: designer/form.ui
+src/form_qt5.py: designer/form.ui
 	pyuic5 $^ > $@
+
+src/form_qt6.py: designer/form.ui
+	pyuic6 $^ > $@
 
 $(PACKAGE_NAME).ankiaddon: src/*
 	rm -f $@

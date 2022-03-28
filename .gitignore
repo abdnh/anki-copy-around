@@ -1,7 +1,8 @@
 venv/
 ankiprofile/
-src/form.py
+src/form_*.py
 *.ankiaddon
 *.zip
 __pycache__/
+.mypy_cache/
 TODO.md

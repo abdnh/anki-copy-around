@@ -4,12 +4,16 @@ from typing import List, Optional
 import anki
 from anki.decks import DeckId
 from aqt.qt import *
+from aqt import qtmajor
 from aqt.main import AnkiQt
 from aqt.deckchooser import DeckChooser
 from anki.notes import Note
 from anki.utils import stripHTML
 
-from .form import Ui_Dialog
+if qtmajor > 5:
+    from .form_qt6 import Ui_Dialog
+else:
+    from .form_qt5 import Ui_Dialog
 from . import consts
 
 ANKI_POINT_VERSION = int(anki.version.split(".")[-1])
