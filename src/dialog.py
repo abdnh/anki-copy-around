@@ -134,7 +134,7 @@ class CopyAroundDialog(QDialog):
     ):
         self.updated_notes = []
         for i, note in enumerate(self.notes):
-            if i % 20:
+            if i % 20 == 0:
                 self.mw.taskman.run_on_main(
                     lambda: self.mw.progress.update(
                         label=PROGRESS_LABEL.format(count=0, total=len(self.notes)),
