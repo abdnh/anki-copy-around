@@ -146,8 +146,9 @@ class CopyAroundDialog(QDialog):
             if i % 20 == 0:
                 self.mw.taskman.run_on_main(
                     lambda: self.mw.progress.update(
-                        label=PROGRESS_LABEL.format(count=0, total=len(self.notes)),
+                        label=PROGRESS_LABEL.format(count=i, total=len(self.notes)),
                         value=i + 1,
+                        max=len(self.notes),
                     )
                 )
             search_for = self._preprocess_search(note[search_field])
