@@ -8,6 +8,7 @@ from aqt import qtmajor
 from aqt.main import AnkiQt
 from aqt.deckchooser import DeckChooser
 from anki.notes import Note
+from aqt.utils import showWarning
 
 try:
     from anki.utils import strip_html as stripHTML
@@ -75,6 +76,14 @@ class CopyAroundDialog(QDialog):
         self._update_dest_fields(self.deckChooser.selectedId())
 
     def exec(self) -> int:
+        mids = set(note.mid for note in self.notes)
+        if len(mids) > 1:
+            showWarning(
+                "Please select notes from only one notetype.",
+                parent=self,
+                title=consts.ADDON_NAME,
+            )
+            return 0
         copy_from_deck = self.mw.col.decks.by_name(self.config["copy_from_deck"])
         if copy_from_deck:
             self.deckChooser.selected_deck_id = copy_from_deck["id"]
