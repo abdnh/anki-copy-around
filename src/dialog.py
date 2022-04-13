@@ -66,6 +66,10 @@ class CopyAroundDialog(QDialog):
             self.form.matchedNotesLimitCheckBox.toggled,
             lambda t: self.form.matchedNotesSpinBox.setEnabled(t),
         )
+        qconnect(
+            self.form.searchInFieldCheckBox.toggled,
+            lambda t: self.form.searchInFieldComboBox.setEnabled(t),
+        )
         self.src_fields = []
         for note in self.notes:
             for field in note.keys():
@@ -108,6 +112,11 @@ class CopyAroundDialog(QDialog):
         if copy_from_field := self._get_field(self.dest_fields, copy_from_field):
             self.form.copyFromFieldComboBox.setCurrentText(copy_from_field)
 
+        search_in_field = self.config["search_in_field"]
+        if search_in_field := self._get_field(self.dest_fields, search_in_field):
+            self.form.searchInFieldCheckBox.setChecked(True)
+            self.form.searchInFieldComboBox.setCurrentText(search_in_field)
+
         return super().exec()
 
     def _get_field(self, fields: List[str], key) -> Optional[str]:
@@ -118,19 +127,22 @@ class CopyAroundDialog(QDialog):
 
     def _update_dest_fields(self, dest_did: DeckId):
         self.dest_fields: List[str] = []
-        for nid in self.mw.col.find_notes(f"did:{dest_did}"):
+        deck = self._escape_search_term(self.mw.col.decks.get(dest_did)["name"])
+        for nid in self.mw.col.find_notes(f"deck:{deck}"):
             note = self.mw.col.get_note(nid)
             for field in note.keys():
                 if field not in self.dest_fields:
                     self.dest_fields.append(field)
         self.form.copyFromFieldComboBox.clear()
         self.form.copyFromFieldComboBox.addItems(self.dest_fields)
+        self.form.searchInFieldComboBox.clear()
+        self.form.searchInFieldComboBox.addItems(self.dest_fields)
 
-    def _preprocess_search(self, text: str) -> str:
-        text = stripHTML(text)
+    def _escape_search_term(self, text: str) -> str:
         text = text.replace("\\", "\\\\")
         text = text.replace(":", "\\:")
         text = text.replace('"', '\\"')
+        text = text.replace("_", "\_")
         return f'"{text}"'
 
     def _process_notes(
@@ -138,6 +150,7 @@ class CopyAroundDialog(QDialog):
         did: DeckId,
         search_field: str,
         copy_into_field: str,
+        search_in_field: str,
         copy_from_field: str,
         matched_notes_count: int,
     ):
@@ -151,8 +164,13 @@ class CopyAroundDialog(QDialog):
                         max=len(self.notes),
                     )
                 )
-            search_for = self._preprocess_search(note[search_field])
-            query = self.mw.col.build_search_string(f"did:{did}", search_for)
+
+            deck = self._escape_search_term(self.mw.col.decks.get(did)["name"])
+            search_terms = [f"deck:{deck}"]
+            # search in all fields, then filter by chosen search field if any
+            search_text = stripHTML(note[search_field])
+            search_terms.append(self._escape_search_term(search_text))
+            query = self.mw.col.build_search_string(*search_terms)
             nids = self.mw.col.find_notes(query)
             if not nids:
                 continue
@@ -162,6 +180,15 @@ class CopyAroundDialog(QDialog):
             for nid in nids:
                 dest_note = self.mw.col.get_note(nid)
                 if copy_from_field not in dest_note:
+                    continue
+                # filter by chosen field
+                if search_in_field and (
+                    search_in_field not in dest_note
+                    or (
+                        search_in_field in dest_note
+                        and search_text not in stripHTML(dest_note[search_in_field])
+                    )
+                ):
                     continue
                 copied.append(dest_note[copy_from_field])
             note[copy_into_field] = "<br>".join(copied)
@@ -173,6 +200,11 @@ class CopyAroundDialog(QDialog):
             self.form.copyIntoFieldComboBox.currentIndex()
         ]
         did = self.deckChooser.selectedId()
+        search_in_field = (
+            self.dest_fields[self.form.searchInFieldComboBox.currentIndex()]
+            if self.form.searchInFieldCheckBox.isChecked()
+            else ""
+        )
         copy_from_field = self.dest_fields[
             self.form.copyFromFieldComboBox.currentIndex()
         ]
@@ -186,6 +218,7 @@ class CopyAroundDialog(QDialog):
         self.config["search_field"] = search_field
         self.config["copy_into_field"] = copy_into_field
         self.config["copy_from_deck"] = self.mw.col.decks.get(did)["name"]
+        self.config["search_in_field"] = search_in_field
         self.config["copy_from_field"] = copy_from_field
         self.config["matched_notes_limit"] = matched_notes_count
         self.mw.addonManager.writeConfig(__name__, self.config)
@@ -208,6 +241,7 @@ class CopyAroundDialog(QDialog):
                 did,
                 search_field,
                 copy_into_field,
+                search_in_field,
                 copy_from_field,
                 matched_notes_count,
             ),

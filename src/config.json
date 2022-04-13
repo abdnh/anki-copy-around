@@ -4,6 +4,7 @@
     "search_field": "word",
     "copy_into_field": "text_vocal",
     "copy_from_deck": "Deck 2",
+    "search_in_field": "Expression",
     "copy_from_field": "Snapshot",
     "matched_notes_limit": -1
 }
