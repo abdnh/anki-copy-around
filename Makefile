@@ -31,5 +31,4 @@ check:
 	python -m mypy src/
 
 clean:
-	rm -f src/form_qt5.py src/form_qt6.py
 	rm -f $(PACKAGE_NAME).ankiaddon
