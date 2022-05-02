@@ -6,5 +6,6 @@
     "copy_from_deck": "Deck 2",
     "search_in_field": "Expression",
     "copy_from_field": "Snapshot",
-    "matched_notes_limit": -1
+    "matched_notes_limit": -1,
+    "randomize_results": false
 }

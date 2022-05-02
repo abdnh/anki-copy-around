@@ -51,7 +51,7 @@ class Ui_Dialog(object):
         self.formLayout_2.setWidget(5, QtWidgets.QFormLayout.FieldRole, self.matchedNotesSpinBox)
         self.copyButton = QtWidgets.QPushButton(Dialog)
         self.copyButton.setObjectName("copyButton")
-        self.formLayout_2.setWidget(6, QtWidgets.QFormLayout.FieldRole, self.copyButton)
+        self.formLayout_2.setWidget(7, QtWidgets.QFormLayout.FieldRole, self.copyButton)
         self.searchInFieldCheckBox = QtWidgets.QCheckBox(Dialog)
         self.searchInFieldCheckBox.setObjectName("searchInFieldCheckBox")
         self.formLayout_2.setWidget(3, QtWidgets.QFormLayout.LabelRole, self.searchInFieldCheckBox)
@@ -59,6 +59,9 @@ class Ui_Dialog(object):
         self.searchInFieldComboBox.setEnabled(False)
         self.searchInFieldComboBox.setObjectName("searchInFieldComboBox")
         self.formLayout_2.setWidget(3, QtWidgets.QFormLayout.FieldRole, self.searchInFieldComboBox)
+        self.randomizeCheckBox = QtWidgets.QCheckBox(Dialog)
+        self.randomizeCheckBox.setObjectName("randomizeCheckBox")
+        self.formLayout_2.setWidget(6, QtWidgets.QFormLayout.SpanningRole, self.randomizeCheckBox)
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
@@ -78,3 +81,4 @@ class Ui_Dialog(object):
         self.matchedNotesLimitCheckBox.setText(_translate("Dialog", "Limit matched notes"))
         self.copyButton.setText(_translate("Dialog", "Copy"))
         self.searchInFieldCheckBox.setText(_translate("Dialog", "Field to search in"))
+        self.randomizeCheckBox.setText(_translate("Dialog", "Randomize results"))

@@ -10,16 +10,12 @@ from aqt.deckchooser import DeckChooser
 from anki.notes import Note
 from aqt.utils import showWarning
 
-try:
-    from anki.utils import strip_html as stripHTML
-except:
-    from anki.utils import stripHTML
-
 if qtmajor > 5:
     from .form_qt6 import Ui_Dialog
 else:
     from .form_qt5 import Ui_Dialog
 from . import consts
+from .copy_around import get_related_content, escape_search_term
 
 ANKI_POINT_VERSION = int(anki.version.split(".")[-1])
 
@@ -117,6 +113,9 @@ class CopyAroundDialog(QDialog):
             self.form.searchInFieldCheckBox.setChecked(True)
             self.form.searchInFieldComboBox.setCurrentText(search_in_field)
 
+        randomize_results = self.config["randomize_results"]
+        self.form.randomizeCheckBox.setChecked(randomize_results)
+
         return super().exec()
 
     def _get_field(self, fields: List[str], key) -> Optional[str]:
@@ -127,7 +126,7 @@ class CopyAroundDialog(QDialog):
 
     def _update_dest_fields(self, dest_did: DeckId):
         self.dest_fields: List[str] = []
-        deck = self._escape_search_term(self.mw.col.decks.get(dest_did)["name"])
+        deck = escape_search_term(self.mw.col.decks.get(dest_did)["name"])
         for nid in self.mw.col.find_notes(f"deck:{deck}"):
             note = self.mw.col.get_note(nid)
             for field in note.keys():
@@ -138,13 +137,6 @@ class CopyAroundDialog(QDialog):
         self.form.searchInFieldComboBox.clear()
         self.form.searchInFieldComboBox.addItems(self.dest_fields)
 
-    def _escape_search_term(self, text: str) -> str:
-        text = text.replace("\\", "\\\\")
-        text = text.replace(":", "\\:")
-        text = text.replace('"', '\\"')
-        text = text.replace("_", "\_")
-        return f'"{text}"'
-
     def _process_notes(
         self,
         did: DeckId,
@@ -153,6 +145,7 @@ class CopyAroundDialog(QDialog):
         search_in_field: str,
         copy_from_field: str,
         matched_notes_count: int,
+        randomize_results: bool,
     ):
         self.updated_notes = []
         for i, note in enumerate(self.notes):
@@ -164,34 +157,16 @@ class CopyAroundDialog(QDialog):
                         max=len(self.notes),
                     )
                 )
-
-            deck = self._escape_search_term(self.mw.col.decks.get(did)["name"])
-            search_terms = [f"deck:{deck}"]
-            # search in all fields, then filter by chosen search field if any
-            search_text = stripHTML(note[search_field])
-            search_terms.append(self._escape_search_term(search_text))
-            query = self.mw.col.build_search_string(*search_terms)
-            nids = self.mw.col.find_notes(query)
-            if not nids:
-                continue
-            if matched_notes_count > 0:
-                nids = nids[:matched_notes_count]
-            copied = []
-            for nid in nids:
-                dest_note = self.mw.col.get_note(nid)
-                if copy_from_field not in dest_note:
-                    continue
-                # filter by chosen field
-                if search_in_field and (
-                    search_in_field not in dest_note
-                    or (
-                        search_in_field in dest_note
-                        and search_text not in stripHTML(dest_note[search_in_field])
-                    )
-                ):
-                    continue
-                copied.append(dest_note[copy_from_field])
-            note[copy_into_field] = "<br>".join(copied)
+            copied = get_related_content(
+                note,
+                did,
+                search_field,
+                search_in_field,
+                copy_from_field,
+                matched_notes_count,
+                randomize_results,
+            )
+            note[copy_into_field] = copied
             self.updated_notes.append(note)
 
     def on_copy(self):
@@ -213,6 +188,7 @@ class CopyAroundDialog(QDialog):
             if self.form.matchedNotesLimitCheckBox.isChecked()
             else -1
         )
+        randomize_results = self.form.randomizeCheckBox.isChecked()
 
         # save options
         self.config["search_field"] = search_field
@@ -221,6 +197,8 @@ class CopyAroundDialog(QDialog):
         self.config["search_in_field"] = search_in_field
         self.config["copy_from_field"] = copy_from_field
         self.config["matched_notes_limit"] = matched_notes_count
+        self.config["randomize_results"] = randomize_results
+
         self.mw.addonManager.writeConfig(__name__, self.config)
 
         def on_done(fut: Future):
@@ -244,6 +222,7 @@ class CopyAroundDialog(QDialog):
                 search_in_field,
                 copy_from_field,
                 matched_notes_count,
+                randomize_results,
             ),
             on_done=on_done,
         )
