@@ -21,11 +21,10 @@ $(PACKAGE_NAME).ankiaddon: src/*
 # Install in test profile
 install: forms
 	rm -rf src/__pycache__
-	rm -r ankiprofile/addons21/$(PACKAGE_NAME)
 	cp -r src/. ankiprofile/addons21/$(PACKAGE_NAME)
 
 format:
-	python -m black src/
+	python -m black src/ --exclude="form_qt(5|6)\.py"
 
 check:
 	python -m mypy src/

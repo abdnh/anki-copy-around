@@ -13,7 +13,7 @@ from aqt.utils import showWarning
 if qtmajor > 5:
     from .form_qt6 import Ui_Dialog
 else:
-    from .form_qt5 import Ui_Dialog
+    from .form_qt5 import Ui_Dialog  # type: ignore
 from . import consts
 from .copy_around import get_related_content, escape_search_term
 

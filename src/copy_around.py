@@ -41,7 +41,7 @@ def get_related_content(
         random.shuffle(nids)
     if matched_notes_count >= 0:
         nids = nids[:matched_notes_count]
-    copied = ''
+    copied = ""
     for nid in nids:
         dest_note = mw.col.get_note(nid)
         # filter by chosen field
@@ -56,7 +56,6 @@ def get_related_content(
 
         copied_fields = []
         for copy_from_field in copy_from_fields:
-            print(f'{copy_from_field=}')
             if copy_from_field in dest_note:
                 css_class = f'copyaround-field-{copy_from_field.replace(" ", "_")}'
                 copied_fields.append(
