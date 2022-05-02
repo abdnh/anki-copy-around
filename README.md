@@ -7,7 +7,7 @@ The addon's dialog can either be accessed from an editor button or from the brow
 There is also a template filter that can be used to show related information from other notes on-the-fly when reviewing. E.g.
 
 ```
-{{copyaround deck=leech_deck_2 search_in=Expression leech_from=Snapshot,Audio count=2 shuffle=true:word}}
+{{copyaround deck=leech_deck_2 search_in=Expression leech_from=Snapshot,Audio count=2 random=true:word}}
 ```
 
 ## Credit

@@ -16,12 +16,6 @@ def add_filter(
     filter_name: str,
     ctx: TemplateRenderContext,
 ) -> str:
-    """
-    Adds a "copyaround" template filter. E.g.
-    ```
-    {{copyaround deck=leech_deck_2 search_in=Expression leech_from=Snapshot count=2 shuffle=true:word}}
-    ```
-    """
     if not filter_name.startswith(consts.FILTER_NAME):
         return field_text
     options = {}
