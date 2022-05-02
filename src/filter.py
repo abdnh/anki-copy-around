@@ -28,8 +28,8 @@ def add_filter(
 
     did = mw.col.decks.id(options["deck"])
     shuffle = (
-        (True if options["random"].lower() == "true" else False)
-        if "random" in options
+        (True if options["shuffle"].lower() == "true" else False)
+        if "shuffle" in options
         else True
     )
     ret = get_related_content(
