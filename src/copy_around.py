@@ -1,4 +1,5 @@
 import random
+from typing import Iterable
 
 from anki.decks import DeckId
 from anki.notes import Note
@@ -23,7 +24,7 @@ def get_related_content(
     did: DeckId,
     search_field: str,
     search_in_field: str,
-    copy_from_field: str,
+    copy_from_fields: Iterable[str],
     matched_notes_count: int = -1,
     shuffle: bool = False,
 ):
@@ -40,11 +41,9 @@ def get_related_content(
         random.shuffle(nids)
     if matched_notes_count >= 0:
         nids = nids[:matched_notes_count]
-    copied = []
+    copied = ''
     for nid in nids:
         dest_note = mw.col.get_note(nid)
-        if copy_from_field not in dest_note:
-            continue
         # filter by chosen field
         if search_in_field and (
             search_in_field not in dest_note
@@ -54,6 +53,20 @@ def get_related_content(
             )
         ):
             continue
-        copied.append(dest_note[copy_from_field])
 
-    return "<br>".join(copied)
+        copied_fields = []
+        for copy_from_field in copy_from_fields:
+            print(f'{copy_from_field=}')
+            if copy_from_field in dest_note:
+                css_class = f'copyaround-field-{copy_from_field.replace(" ", "_")}'
+                copied_fields.append(
+                    f'<span class="{css_class}">{dest_note[copy_from_field]}</span>'
+                )
+        if copied_fields:
+            copied += (
+                '<div class="copyaround-related-note">'
+                + "".join(copied_fields)
+                + "</div>"
+            )
+
+    return copied

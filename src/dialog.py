@@ -162,12 +162,13 @@ class CopyAroundDialog(QDialog):
                 did,
                 search_field,
                 search_in_field,
-                copy_from_field,
+                [copy_from_field],
                 matched_notes_count,
                 randomize_results,
             )
-            note[copy_into_field] = copied
-            self.updated_notes.append(note)
+            if copied:
+                note[copy_into_field] = copied
+                self.updated_notes.append(note)
 
     def on_copy(self):
         search_field = self.src_fields[self.form.searchFieldComboBox.currentIndex()]

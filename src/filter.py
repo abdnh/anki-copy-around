@@ -19,7 +19,7 @@ def add_filter(
     """
     Adds a "copyaround" template filter. E.g.
     ```
-    {{copyaround deck=leech_deck_2 search_in=Expression leech_from=Snapshot shuffle=true:word}}
+    {{copyaround deck=leech_deck_2 search_in=Expression leech_from=Snapshot count=2 shuffle=true:word}}
     ```
     """
     if not filter_name.startswith(consts.FILTER_NAME):
@@ -29,7 +29,7 @@ def add_filter(
     for match in FILTER_OPTION_RE.finditer(options_text):
         pair = match.groupdict()
         key = pair["key"]
-        value = pair["value"]
+        value = pair["value"].strip('"')
         options[key] = value
 
     did = mw.col.decks.id(options["deck"])
@@ -43,8 +43,8 @@ def add_filter(
         did,
         field_name,
         options.get("search_in", ""),
-        options["leech_from"],
-        1,
+        options["leech_from"].split(","),
+        int(options.get("count", 1)),
         shuffle=shuffle,
     )
     return ret
