@@ -1,4 +1,5 @@
 import random
+import re
 from typing import Iterable
 
 from anki.decks import DeckId
@@ -19,6 +20,9 @@ def escape_search_term(text: str) -> str:
     return f'"{text}"'
 
 
+HIGHLIGHT_COLOR = "#0000ff"
+
+
 def get_related_content(
     note: Note,
     did: DeckId,
@@ -27,6 +31,7 @@ def get_related_content(
     copy_from_fields: Iterable[str],
     matched_notes_count: int = -1,
     shuffle: bool = False,
+    highlight: bool = False,
 ):
     deck = escape_search_term(mw.col.decks.get(did)["name"])
     search_terms = [f"deck:{deck}"]
@@ -58,8 +63,15 @@ def get_related_content(
         for copy_from_field in copy_from_fields:
             if copy_from_field in dest_note:
                 css_class = f'copyaround-field-{copy_from_field.replace(" ", "_")}'
+                field_contents = dest_note[copy_from_field]
+                if highlight:
+                    # TODO: do not touch filenames inside [sound:foo.mp3]
+                    field_contents = field_contents.replace(
+                        search_text,
+                        f'<span style="color: {HIGHLIGHT_COLOR}">{search_text}</span>',
+                    )
                 copied_fields.append(
-                    f'<span class="{css_class}">{dest_note[copy_from_field]}</span>'
+                    f'<span class="{css_class}">{field_contents}</span>'
                 )
         if copied_fields:
             copied += (

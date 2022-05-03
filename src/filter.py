@@ -1,4 +1,5 @@
 import re
+from typing import Dict
 from anki.hooks import field_filter
 from anki.template import TemplateRenderContext
 from aqt import mw
@@ -8,6 +9,12 @@ from .copy_around import get_related_content
 
 # FIXME: doesn't work with values that contain double quotes
 FILTER_OPTION_RE = re.compile(r'((?P<key>\w+)\s*=\s*(?P<value>(".*")|\S*))')
+
+
+def get_bool_filter_option(options: Dict, key: str) -> bool:
+    return (
+        (True if options[key].lower() == "true" else False) if key in options else True
+    )
 
 
 def add_filter(
@@ -27,11 +34,8 @@ def add_filter(
         options[key] = value
 
     did = mw.col.decks.id(options["deck"])
-    shuffle = (
-        (True if options["shuffle"].lower() == "true" else False)
-        if "shuffle" in options
-        else True
-    )
+    shuffle = get_bool_filter_option(options, "shuffle")
+    highlight = get_bool_filter_option(options, "highlight")
     ret = get_related_content(
         ctx.note(),
         did,
@@ -40,6 +44,7 @@ def add_filter(
         options["leech_from"].split(","),
         int(options.get("count", 1)),
         shuffle=shuffle,
+        highlight=highlight,
     )
     return ret
 
