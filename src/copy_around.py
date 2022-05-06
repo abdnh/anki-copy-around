@@ -75,7 +75,7 @@ def get_related_content(
                 )
         if copied_fields:
             copied += (
-                '<div class="copyaround-related-note">'
+                f'<div class="copyaround-related-note" data-nid="{nid}">'
                 + "".join(copied_fields)
                 + "</div>"
             )
