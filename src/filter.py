@@ -58,6 +58,7 @@ def add_filter(
     shuffle = get_bool_filter_option(options, "shuffle")
     highlight = get_bool_filter_option(options, "highlight")
     delayed = get_bool_filter_option(options, "delayed", False)
+    subs2srs = get_bool_filter_option(options, "subs2srs", False)
     label = options.get("label", consts.ADDON_NAME)
 
     if delayed:
@@ -70,6 +71,7 @@ def add_filter(
             matched_notes_count=count,
             shuffle=shuffle,
             highlight=highlight,
+            subs2srs=subs2srs,
         )
         data_json = json.dumps(data).replace('"', "&quot;")
         ret = TOGGLE_BUTTON.format(cmd=consts.FILTER_NAME, data=data_json, label=label)
@@ -83,6 +85,7 @@ def add_filter(
             count,
             shuffle,
             highlight,
+            subs2srs,
         )
     return ret
 

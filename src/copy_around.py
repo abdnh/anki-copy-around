@@ -42,6 +42,7 @@ def get_related_content(
     shuffle: bool = False,
     highlight: bool = False,
     delayed: bool = False,
+    subs2srs: bool = False,
 ) -> str:
     deck = escape_search_term(mw.col.decks.get(did)["name"])
     search_terms = [f"deck:{deck}"]
@@ -91,6 +92,11 @@ def get_related_content(
                 copied_fields.append(
                     f'<span class="{css_class}">{field_contents}</span>'
                 )
+        if subs2srs and (subs2srs_context := mw.subs2srs_context):
+            # get previous and next sub2srs recordings using the subs2srs-context add-on
+            audio_buttons = subs2srs_context.get_audio_buttons(nid)
+            copied_fields.append(audio_buttons)
+
         if copied_fields:
             copied += (
                 f'<div class="copyaround-related-note" data-nid="{nid}">'
