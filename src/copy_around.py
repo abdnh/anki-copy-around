@@ -1,6 +1,7 @@
 import random
 import re
-from typing import Iterable, Match, MutableSequence, cast
+from fileinput import filename
+from typing import Iterable, List, Match, MutableSequence, Tuple, cast
 
 from anki.collection import SearchNode
 from anki.decks import DeckId
@@ -35,7 +36,7 @@ def get_related_content(
     highlight: bool = False,
     delayed: bool = False,
     subs2srs: bool = False,
-) -> str:
+) -> Tuple[str, List[str]]:
     search_terms = [SearchNode(deck=mw.col.decks.get(did)["name"])]
     # search in all fields, then filter by chosen search field if any
     search_text = stripHTML(note[search_field].lower())
@@ -43,11 +44,12 @@ def get_related_content(
     query = mw.col.build_search_string(*search_terms)
     nids = cast(MutableSequence, mw.col.find_notes(query))
     if not nids:
-        return ""
+        return ("", [])
     if shuffle:
         random.shuffle(nids)
     copied = ""
     count = 0
+    audios = []
     for nid in nids:
         if count >= max_notes:
             break
@@ -76,10 +78,13 @@ def get_related_content(
                         f'<span style="color: {HIGHLIGHT_COLOR}">{search_text}</span>',
                     )
                 if delayed:
-
+                    # We need to process audio filenames manually in the delayed=true case
+                    # because Anki's processing of them will have finished at this stage.
                     def repl_sounds(match: Match) -> str:
+                        filename = match.group(1)
+                        audios.append(filename)
                         return PLAY_BUTTON.format(
-                            cmd=consts.FILTER_NAME, filename=match.group(1)
+                            cmd=consts.FILTER_NAME, filename=filename
                         )
 
                     field_contents = SOUND_REF_RE.sub(repl_sounds, field_contents)
@@ -99,4 +104,4 @@ def get_related_content(
             )
             count += 1
 
-    return copied
+    return copied, audios

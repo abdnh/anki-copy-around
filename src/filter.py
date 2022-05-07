@@ -1,15 +1,20 @@
 import json
 import re
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
+from anki.cards import Card
 from anki.hooks import field_filter
 from anki.template import TemplateRenderContext
 from aqt import mw
 from aqt.browser.previewer import Previewer
 from aqt.clayout import CardLayout
-from aqt.gui_hooks import webview_did_receive_js_message
+from aqt.gui_hooks import (
+    card_will_show,
+    state_shortcuts_will_change,
+    webview_did_receive_js_message,
+)
 from aqt.qt import *
-from aqt.sound import play
+from aqt.sound import av_player, play
 from aqt.webview import AnkiWebView
 
 from . import consts
@@ -62,7 +67,7 @@ def add_filter(
     label = options.get("label", consts.ADDON_NAME)
     if delayed:
         data = dict(
-            nid=ctx.note().id,
+            cid=ctx.card().id,
             did=did,
             search_field=field_name,
             search_in_field=search_in,
@@ -75,7 +80,7 @@ def add_filter(
         data_json = json.dumps(data).replace('"', "&quot;")
         ret = TOGGLE_BUTTON.format(cmd=consts.FILTER_NAME, data=data_json, label=label)
     else:
-        ret = get_related_content(
+        ret, _ = get_related_content(
             ctx.note(),
             did,
             field_name,
@@ -88,6 +93,15 @@ def add_filter(
             subs2srs,
         )
     return ret
+
+
+# FIXME: this approach doesn't work with multiple filters
+FILTER_AUDIOS: List[str] = []
+
+
+def play_filter_audios() -> None:
+    for audio in FILTER_AUDIOS:
+        av_player.insert_file(audio)
 
 
 def handle_js_msg(
@@ -109,9 +123,15 @@ def handle_js_msg(
             options = json.loads(data)
             options["delayed"] = True
             # FIXME: cause errors if the note was not written to the database yet (e.g. in the card layouts screen opened from the add screen)
-            options["note"] = mw.col.get_note(options["nid"])
-            del options["nid"]
-            contents = get_related_content(**options)
+            card = mw.col.get_card(options["cid"])
+            note = card.note()
+            options["note"] = note
+            del options["cid"]
+            contents, audios = get_related_content(**options)
+            global FILTER_AUDIOS
+            FILTER_AUDIOS = audios
+            if card.autoplay():
+                play_filter_audios()
             web.eval(
                 f"""
 (() => {{
@@ -137,6 +157,28 @@ def handle_js_msg(
     return (True, None)
 
 
+def replay_audios() -> None:
+    mw.reviewer.replayAudio()
+    play_filter_audios()
+
+
+def modify_replay_shortcut(state: str, shortcuts: List[Tuple[str, Callable]]) -> None:
+    if state != "review":
+        return
+    # modify the 'r' shortcut to play our audios too
+    for i, shortcut in enumerate(shortcuts):
+        if shortcut[0] == "r":
+            shortcuts[i] = (shortcut[0], replay_audios)
+
+
+def reset_filter_audios(text: str, card: Card, kind: str) -> str:
+    global FILTER_AUDIOS
+    FILTER_AUDIOS = []
+    return text
+
+
 def init_filter() -> None:
     field_filter.append(add_filter)
     webview_did_receive_js_message.append(handle_js_msg)
+    state_shortcuts_will_change.append(modify_replay_shortcut)
+    card_will_show.append(reset_filter_audios)
