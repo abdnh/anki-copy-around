@@ -60,7 +60,6 @@ def add_filter(
     delayed = get_bool_filter_option(options, "delayed", False)
     subs2srs = get_bool_filter_option(options, "subs2srs", False)
     label = options.get("label", consts.ADDON_NAME)
-
     if delayed:
         data = dict(
             nid=ctx.note().id,
@@ -68,7 +67,7 @@ def add_filter(
             search_field=field_name,
             search_in_field=search_in,
             copy_from_fields=leech_from,
-            matched_notes_count=count,
+            max_notes=count,
             shuffle=shuffle,
             highlight=highlight,
             subs2srs=subs2srs,
@@ -85,6 +84,7 @@ def add_filter(
             count,
             shuffle,
             highlight,
+            delayed,
             subs2srs,
         )
     return ret
@@ -108,6 +108,7 @@ def handle_js_msg(
                 return
             options = json.loads(data)
             options["delayed"] = True
+            # FIXME: cause errors if the note was not written to the database yet (e.g. in the card layouts screen opened from the add screen)
             options["note"] = mw.col.get_note(options["nid"])
             del options["nid"]
             contents = get_related_content(**options)

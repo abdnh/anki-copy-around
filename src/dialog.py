@@ -2,6 +2,7 @@ from concurrent.futures import Future
 from typing import List, Optional
 
 import anki
+from anki.collection import SearchNode
 from anki.decks import DeckId
 from anki.notes import Note
 from aqt import qtmajor
@@ -11,7 +12,7 @@ from aqt.qt import *
 from aqt.utils import showWarning
 
 from . import consts
-from .copy_around import escape_search_term, get_related_content
+from .copy_around import get_related_content
 
 if qtmajor > 5:
     from .forms.form_qt6 import Ui_Dialog
@@ -128,8 +129,10 @@ class CopyAroundDialog(QDialog):
 
     def _update_dest_fields(self, dest_did: DeckId) -> None:
         self.dest_fields: List[str] = []
-        deck = escape_search_term(self.mw.col.decks.get(dest_did)["name"])
-        for nid in self.mw.col.find_notes(f"deck:{deck}"):
+        search = self.mw.col.build_search_string(
+            SearchNode(deck=self.mw.col.decks.get(dest_did)["name"])
+        )
+        for nid in self.mw.col.find_notes(search):
             note = self.mw.col.get_note(nid)
             for field in note.keys():
                 if field not in self.dest_fields:
@@ -146,7 +149,7 @@ class CopyAroundDialog(QDialog):
         copy_into_field: str,
         search_in_field: str,
         copy_from_field: str,
-        matched_notes_count: int,
+        max_notes: int,
         randomize_results: bool,
     ) -> None:
         self.updated_notes = []
@@ -165,7 +168,7 @@ class CopyAroundDialog(QDialog):
                 search_field,
                 search_in_field,
                 [copy_from_field],
-                matched_notes_count,
+                max_notes,
                 randomize_results,
             )
             if copied:
@@ -186,7 +189,7 @@ class CopyAroundDialog(QDialog):
         copy_from_field = self.dest_fields[
             self.form.copyFromFieldComboBox.currentIndex()
         ]
-        matched_notes_count = (
+        max_notes = (
             self.form.matchedNotesSpinBox.value()
             if self.form.matchedNotesLimitCheckBox.isChecked()
             else -1
@@ -199,7 +202,7 @@ class CopyAroundDialog(QDialog):
         self.config["copy_from_deck"] = self.mw.col.decks.get(did)["name"]
         self.config["search_in_field"] = search_in_field
         self.config["copy_from_field"] = copy_from_field
-        self.config["matched_notes_limit"] = matched_notes_count
+        self.config["matched_notes_limit"] = max_notes
         self.config["randomize_results"] = randomize_results
 
         self.mw.addonManager.writeConfig(__name__, self.config)
@@ -224,7 +227,7 @@ class CopyAroundDialog(QDialog):
                 copy_into_field,
                 search_in_field,
                 copy_from_field,
-                matched_notes_count,
+                max_notes,
                 randomize_results,
             ),
             on_done=on_done,
