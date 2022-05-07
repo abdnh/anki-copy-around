@@ -24,7 +24,7 @@ install: forms
 	cp -r src/. ankiprofile/addons21/$(PACKAGE_NAME)
 
 fix:
-	python -m black src
+	python -m black src --exclude=forms
 	python -m isort src
 
 mypy:
