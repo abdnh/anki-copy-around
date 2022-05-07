@@ -7,5 +7,6 @@
     "search_in_field": "Expression",
     "copy_from_field": "Snapshot",
     "matched_notes_limit": -1,
-    "randomize_results": false
+    "randomize_results": false,
+    "trigger_filter_button_shortcut": "K"
 }

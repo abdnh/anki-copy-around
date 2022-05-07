@@ -23,7 +23,10 @@ from .copy_around import get_related_content
 # FIXME: doesn't work with values that contain double quotes
 FILTER_OPTION_RE = re.compile(r'((?P<key>\w+)\s*=\s*(?P<value>(".*")|\S*))')
 
-TOGGLE_BUTTON = """<button id="copyaround-toggle" onclick="pycmd('{cmd}:show:{data}'); return false;" style="display: block; margin: 5px auto;">{label}</button>"""
+TRIGGER_FILTER_BUTTON_SHORTCUT = mw.addonManager.getConfig(__name__)[
+    "trigger_filter_button_shortcut"
+]
+TOGGLE_BUTTON = """<button id="copyaround-toggle" title="Shortcut: {shortcut}" onclick="pycmd('{cmd}:show:{data}'); return false;" style="display: block; margin: 5px auto;">{label}</button>"""
 
 
 def get_active_webview() -> AnkiWebView:
@@ -78,7 +81,12 @@ def add_filter(
             subs2srs=subs2srs,
         )
         data_json = json.dumps(data).replace('"', "&quot;")
-        ret = TOGGLE_BUTTON.format(cmd=consts.FILTER_NAME, data=data_json, label=label)
+        ret = TOGGLE_BUTTON.format(
+            cmd=consts.FILTER_NAME,
+            data=data_json,
+            label=label,
+            shortcut=TRIGGER_FILTER_BUTTON_SHORTCUT,
+        )
     else:
         ret, _ = get_related_content(
             ctx.note(),
@@ -104,6 +112,48 @@ def play_filter_audios() -> None:
         av_player.insert_file(audio)
 
 
+def show_copyaround_contents(data: str) -> None:
+    web = get_active_webview()
+
+    def show(rendered: bool) -> None:
+        if rendered:
+            return
+        options = json.loads(data)
+        options["delayed"] = True
+        # FIXME: cause errors if the note was not written to the database yet (e.g. in the card layouts screen opened from the add screen)
+        card = mw.col.get_card(options["cid"])
+        note = card.note()
+        options["note"] = note
+        del options["cid"]
+        contents, audios = get_related_content(**options)
+        global FILTER_AUDIOS
+        FILTER_AUDIOS = audios
+        if card.autoplay():
+            play_filter_audios()
+        web.eval(
+            f"""
+(() => {{
+var copyAroundToggle = document.getElementById('copyaround-toggle');
+copyAroundToggle.insertAdjacentHTML('afterend', {json.dumps(contents)});
+}})();
+        """
+        )
+
+    web.evalWithCallback(
+        """
+(() => {
+var copyAroundToggle = document.getElementById('copyaround-toggle');
+if(!copyAroundToggle.dataset.rendered) {
+    copyAroundToggle.dataset.rendered = true;
+    return false;
+} else {
+    return true;
+}
+})();""",
+        show,
+    )
+
+
 def handle_js_msg(
     handled: Tuple[bool, Any], message: str, context: Any
 ) -> Tuple[bool, Any]:
@@ -115,51 +165,24 @@ def handle_js_msg(
         filename = data
         play(filename)
     elif subcmd == "show":
-        web = get_active_webview()
-
-        def show(rendered: bool) -> None:
-            if rendered:
-                return
-            options = json.loads(data)
-            options["delayed"] = True
-            # FIXME: cause errors if the note was not written to the database yet (e.g. in the card layouts screen opened from the add screen)
-            card = mw.col.get_card(options["cid"])
-            note = card.note()
-            options["note"] = note
-            del options["cid"]
-            contents, audios = get_related_content(**options)
-            global FILTER_AUDIOS
-            FILTER_AUDIOS = audios
-            if card.autoplay():
-                play_filter_audios()
-            web.eval(
-                f"""
-(() => {{
-    var copyAroundToggle = document.getElementById('copyaround-toggle');
-    copyAroundToggle.insertAdjacentHTML('afterend', {json.dumps(contents)});
-}})();
-            """
-            )
-
-        web.evalWithCallback(
-            """
-(() => {
-    var copyAroundToggle = document.getElementById('copyaround-toggle');
-    if(!copyAroundToggle.dataset.rendered) {
-        copyAroundToggle.dataset.rendered = true;
-        return false;
-    } else {
-        return true;
-    }
-})();""",
-            show,
-        )
+        show_copyaround_contents(data)
     return (True, None)
 
 
 def replay_audios() -> None:
     mw.reviewer.replayAudio()
     play_filter_audios()
+
+
+def on_show_hotkey_triggered() -> None:
+    web = get_active_webview()
+    web.eval(
+        """
+(() => {
+var copyAroundToggle = document.getElementById('copyaround-toggle');
+copyAroundToggle.click();
+})();""",
+    )
 
 
 def modify_replay_shortcut(state: str, shortcuts: List[Tuple[str, Callable]]) -> None:
@@ -169,6 +192,8 @@ def modify_replay_shortcut(state: str, shortcuts: List[Tuple[str, Callable]]) ->
     for i, shortcut in enumerate(shortcuts):
         if shortcut[0] == "r":
             shortcuts[i] = (shortcut[0], replay_audios)
+
+    shortcuts.append((TRIGGER_FILTER_BUTTON_SHORTCUT, on_show_hotkey_triggered))
 
 
 def reset_filter_audios(text: str, card: Card, kind: str) -> str:
