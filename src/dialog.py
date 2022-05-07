@@ -3,21 +3,23 @@ from typing import List, Optional
 
 import anki
 from anki.decks import DeckId
-from aqt.qt import *
-from aqt import qtmajor
-from aqt.main import AnkiQt
-from aqt.deckchooser import DeckChooser
 from anki.notes import Note
+from aqt import qtmajor
+from aqt.deckchooser import DeckChooser
+from aqt.main import AnkiQt
+from aqt.qt import *
 from aqt.utils import showWarning
 
-if qtmajor > 5:
-    from .form_qt6 import Ui_Dialog
-else:
-    from .form_qt5 import Ui_Dialog  # type: ignore
 from . import consts
-from .copy_around import get_related_content, escape_search_term
+from .copy_around import escape_search_term, get_related_content
 
-ANKI_POINT_VERSION = int(anki.version.split(".")[-1])
+if qtmajor > 5:
+    from .forms.form_qt6 import Ui_Dialog
+else:
+    from .forms.form_qt5 import Ui_Dialog  # type: ignore
+
+
+ANKI_POINT_VERSION = int(anki.version.split(".")[-1])  # type: ignore
 
 
 PROGRESS_LABEL = "Processed {count} out of {total} note(s)"
@@ -33,47 +35,47 @@ class MyDeckChooser(DeckChooser):
 
 
 class CopyAroundDialog(QDialog):
-    def __init__(self, mw: AnkiQt, parent, notes: List[Note]):
+    def __init__(self, mw: AnkiQt, parent: QWidget, notes: List[Note]):
         super().__init__(parent)
         self.mw = mw
         self.config = mw.addonManager.getConfig(__name__)
         self.notes = notes
         self.setup_ui()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         self.form = Ui_Dialog()
         self.form.setupUi(self)
         self.setWindowTitle(consts.ADDON_NAME)
         # StudyDeck, which is used by DeckChooser, is asynchronous in 2.1.50
         if ANKI_POINT_VERSION >= 50:
-            self.deckChooser = MyDeckChooser(
+            self.deck_chooser = MyDeckChooser(
                 self.mw,
-                self.form.deckChooser,
+                self.form.deckChooser,  # type: ignore
                 label=False,
                 on_deck_changed=self._update_dest_fields,
             )
         else:
-            self.deckChooser = MyDeckChooser(
-                self.mw, self.form.deckChooser, label=False
+            self.deck_chooser = MyDeckChooser(
+                self.mw, self.form.deckChooser, label=False  # type: ignore
             )
-            qconnect(self.deckChooser.onDeckChanged, self._update_dest_fields)
+            qconnect(MyDeckChooser.onDeckChanged, self._update_dest_fields)
         qconnect(self.form.copyButton.clicked, self.on_copy)
         qconnect(
             self.form.matchedNotesLimitCheckBox.toggled,
-            lambda t: self.form.matchedNotesSpinBox.setEnabled(t),
+            self.form.matchedNotesSpinBox.setEnabled,
         )
         qconnect(
             self.form.searchInFieldCheckBox.toggled,
-            lambda t: self.form.searchInFieldComboBox.setEnabled(t),
+            self.form.searchInFieldComboBox.setEnabled,
         )
-        self.src_fields = []
+        self.src_fields: List[str] = []
         for note in self.notes:
             for field in note.keys():
                 if field not in self.src_fields:
                     self.src_fields.append(field)
         self.form.searchFieldComboBox.addItems(self.src_fields)
         self.form.copyIntoFieldComboBox.addItems(self.src_fields)
-        self._update_dest_fields(self.deckChooser.selectedId())
+        self._update_dest_fields(self.deck_chooser.selectedId())
 
     def exec(self) -> int:
         mids = set(note.mid for note in self.notes)
@@ -86,7 +88,7 @@ class CopyAroundDialog(QDialog):
             return 0
         copy_from_deck = self.mw.col.decks.by_name(self.config["copy_from_deck"])
         if copy_from_deck:
-            self.deckChooser.selected_deck_id = copy_from_deck["id"]
+            self.deck_chooser.selected_deck_id = copy_from_deck["id"]
             self._update_dest_fields(copy_from_deck["id"])
 
         matched_notes_limit = self.config["matched_notes_limit"]
@@ -118,13 +120,13 @@ class CopyAroundDialog(QDialog):
 
         return super().exec()
 
-    def _get_field(self, fields: List[str], key) -> Optional[str]:
+    def _get_field(self, fields: List[str], key: str) -> Optional[str]:
         for field in fields:
             if key.lower() == field.lower():
                 return field
         return None
 
-    def _update_dest_fields(self, dest_did: DeckId):
+    def _update_dest_fields(self, dest_did: DeckId) -> None:
         self.dest_fields: List[str] = []
         deck = escape_search_term(self.mw.col.decks.get(dest_did)["name"])
         for nid in self.mw.col.find_notes(f"deck:{deck}"):
@@ -146,12 +148,12 @@ class CopyAroundDialog(QDialog):
         copy_from_field: str,
         matched_notes_count: int,
         randomize_results: bool,
-    ):
+    ) -> None:
         self.updated_notes = []
         for i, note in enumerate(self.notes):
             if i % 20 == 0:
                 self.mw.taskman.run_on_main(
-                    lambda: self.mw.progress.update(
+                    lambda i=i: self.mw.progress.update(
                         label=PROGRESS_LABEL.format(count=i, total=len(self.notes)),
                         value=i + 1,
                         max=len(self.notes),
@@ -170,12 +172,12 @@ class CopyAroundDialog(QDialog):
                 note[copy_into_field] = copied
                 self.updated_notes.append(note)
 
-    def on_copy(self):
+    def on_copy(self) -> None:
         search_field = self.src_fields[self.form.searchFieldComboBox.currentIndex()]
         copy_into_field = self.src_fields[
             self.form.copyIntoFieldComboBox.currentIndex()
         ]
-        did = self.deckChooser.selectedId()
+        did = self.deck_chooser.selectedId()
         search_in_field = (
             self.dest_fields[self.form.searchInFieldComboBox.currentIndex()]
             if self.form.searchInFieldCheckBox.isChecked()
@@ -202,11 +204,11 @@ class CopyAroundDialog(QDialog):
 
         self.mw.addonManager.writeConfig(__name__, self.config)
 
-        def on_done(fut: Future):
+        def on_done(fut: Future) -> None:
             try:
                 fut.result()
             finally:
-                self.mw.taskman.run_on_main(lambda: self.mw.progress.finish())
+                self.mw.taskman.run_on_main(self.mw.progress.finish)
             self.accept()
 
         self.mw.progress.start(

@@ -1,21 +1,18 @@
 from typing import List
 
-from aqt.gui_hooks import (
-    browser_menus_did_init,
-    editor_did_init_buttons,
-)
 import aqt
-from aqt.qt import *
 from aqt.browser.browser import Browser
 from aqt.editor import Editor
-from aqt.utils import tooltip
+from aqt.gui_hooks import browser_menus_did_init, editor_did_init_buttons
 from aqt.operations import CollectionOp
+from aqt.qt import *
+from aqt.utils import tooltip
 
 from . import consts
 from .dialog import CopyAroundDialog
 
 
-def on_bulk_updated_notes(browser: Browser, updated_count: int):
+def on_bulk_updated_notes(browser: Browser, updated_count: int) -> None:
     if updated_count:
         tooltip(f"Updated {updated_count} note(s).", parent=browser)
 
@@ -33,13 +30,13 @@ def on_browser_action_triggered(browser: Browser) -> None:
         ).run_in_background()
 
 
-def on_browser_menus_did_init(browser: Browser):
+def on_browser_menus_did_init(browser: Browser) -> None:
     config = aqt.mw.addonManager.getConfig(__name__)
-    a = QAction(consts.ADDON_NAME, browser)
-    a.setShortcut(config["browser_shortcut"])
-    qconnect(a.triggered, lambda: on_browser_action_triggered(browser))
+    action = QAction(consts.ADDON_NAME, browser)
+    action.setShortcut(config["browser_shortcut"])
+    qconnect(action.triggered, lambda: on_browser_action_triggered(browser))
     browser.form.menuEdit.addSeparator()
-    browser.form.menuEdit.addAction(a)
+    browser.form.menuEdit.addAction(action)
 
 
 def on_editor_button_clicked(editor: Editor) -> None:
@@ -48,7 +45,7 @@ def on_editor_button_clicked(editor: Editor) -> None:
         editor.loadNoteKeepingFocus()
 
 
-def on_editor_did_init_buttons(buttons: List[str], editor: Editor):
+def on_editor_did_init_buttons(buttons: List[str], editor: Editor) -> None:
     config = aqt.mw.addonManager.getConfig(__name__)
     shortcut = config["editor_shortcut"]
     button = editor.addButton(
@@ -61,6 +58,6 @@ def on_editor_did_init_buttons(buttons: List[str], editor: Editor):
     buttons.append(button)
 
 
-def init_hooks():
+def init_hooks() -> None:
     browser_menus_did_init.append(on_browser_menus_did_init)
     editor_did_init_buttons.append(on_editor_did_init_buttons)
