@@ -10,7 +10,7 @@ from . import consts
 
 try:
     from anki.utils import strip_html as stripHTML
-except ModuleNotFoundError:
+except ImportError:
     from anki.utils import stripHTML
 
 
