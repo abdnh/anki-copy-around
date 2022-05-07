@@ -92,7 +92,7 @@ def get_related_content(
                 copied_fields.append(
                     f'<span class="{css_class}">{field_contents}</span>'
                 )
-        if subs2srs and (subs2srs_context := mw.subs2srs_context):
+        if subs2srs and (subs2srs_context := getattr(mw, "subs2srs_context", None)):
             # get previous and next sub2srs recordings using the subs2srs-context add-on
             audio_buttons = subs2srs_context.get_audio_buttons(nid)
             copied_fields.append(audio_buttons)
