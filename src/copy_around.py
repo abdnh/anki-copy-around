@@ -1,6 +1,5 @@
 import random
 import re
-from fileinput import filename
 from typing import Iterable, List, Match, MutableSequence, Tuple, cast
 
 from anki.collection import SearchNode
