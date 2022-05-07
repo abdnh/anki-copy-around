@@ -1,14 +1,16 @@
 import random
 import re
-from typing import Iterable
+from typing import Iterable, Match, MutableSequence, cast
 
 from anki.decks import DeckId
 from anki.notes import Note
 from aqt import mw
 
+from . import consts
+
 try:
     from anki.utils import strip_html as stripHTML
-except:
+except ModuleNotFoundError:
     from anki.utils import stripHTML
 
 
@@ -16,11 +18,18 @@ def escape_search_term(text: str) -> str:
     text = text.replace("\\", "\\\\")
     text = text.replace(":", "\\:")
     text = text.replace('"', '\\"')
-    text = text.replace("_", "\_")
+    text = text.replace("_", r"\_")
     return f'"{text}"'
 
 
 HIGHLIGHT_COLOR = "#0000ff"
+SOUND_REF_RE = re.compile(r"\[sound:(.*?)\]")
+PLAY_BUTTON = """<a class="replay-button soundLink" href=# onclick="pycmd('{cmd}:play:{filename}'); return false;">
+    <svg class="playImage" viewBox="0 0 64 64" version="1.1">
+        <circle cx="32" cy="32" r="29" />
+        <path d="M56.502,32.301l-37.502,20.101l0.329,-40.804l37.173,20.703Z" />
+    </svg>
+</a>"""
 
 
 def get_related_content(
@@ -32,14 +41,15 @@ def get_related_content(
     matched_notes_count: int = -1,
     shuffle: bool = False,
     highlight: bool = False,
-):
+    delayed: bool = False,
+) -> str:
     deck = escape_search_term(mw.col.decks.get(did)["name"])
     search_terms = [f"deck:{deck}"]
     # search in all fields, then filter by chosen search field if any
     search_text = stripHTML(note[search_field])
     search_terms.append(escape_search_term(search_text))
     query = mw.col.build_search_string(*search_terms)
-    nids = mw.col.find_notes(query)
+    nids = cast(MutableSequence, mw.col.find_notes(query))
     if not nids:
         return ""
     if shuffle:
@@ -65,11 +75,19 @@ def get_related_content(
                 css_class = f'copyaround-field-{copy_from_field.replace(" ", "_")}'
                 field_contents = dest_note[copy_from_field]
                 if highlight:
-                    # TODO: do not touch filenames inside [sound:foo.mp3]
+                    # FIXME: do not touch filenames inside [sound:foo.mp3]
                     field_contents = field_contents.replace(
                         search_text,
                         f'<span style="color: {HIGHLIGHT_COLOR}">{search_text}</span>',
                     )
+                if delayed:
+
+                    def repl_sounds(match: Match) -> str:
+                        return PLAY_BUTTON.format(
+                            cmd=consts.FILTER_NAME, filename=match.group(1)
+                        )
+
+                    field_contents = SOUND_REF_RE.sub(repl_sounds, field_contents)
                 copied_fields.append(
                     f'<span class="{css_class}">{field_contents}</span>'
                 )
