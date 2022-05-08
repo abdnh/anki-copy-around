@@ -1,5 +1,5 @@
 import random
-from typing import Iterable, MutableSequence, Optional, cast
+from typing import Iterable, List, MutableSequence, Optional, Union, cast
 
 from anki.cards import Card
 from anki.collection import SearchNode
@@ -29,7 +29,9 @@ def get_related_content(
     card: Optional[Card] = None,
     side: str = "question",
 ) -> str:
-    search_terms = [SearchNode(deck=mw.col.decks.get(did)["name"])]
+    search_terms: List[Union[str, SearchNode]] = [
+        SearchNode(deck=mw.col.decks.get(did)["name"])
+    ]
     search_text = note[search_field]
     search_terms.append(search_text)
     field_terms = []
@@ -80,7 +82,7 @@ def get_related_content(
                     field_contents, tags = playback_controller.add_sound_tags_from_text(
                         field_contents,
                         "q" if side == "question" else "a",
-                        card.autoplay(),
+                        card and card.autoplay(),
                     )
                 copied_fields.append(
                     f'<span class="{css_class}">{field_contents}</span>'

@@ -1,8 +1,11 @@
 import json
 import re
-from typing import Any, Dict, List, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
+from anki.cards import Card
 from anki.hooks import field_filter
+from anki.notes import Note
 from anki.template import TemplateRenderContext
 from aqt import mw
 from aqt.browser.previewer import Previewer
@@ -23,14 +26,42 @@ TRIGGER_FILTER_BUTTON_SHORTCUT = mw.addonManager.getConfig(__name__)[
 TOGGLE_BUTTON = """<button id="copyaround-toggle" title="Shortcut: {shortcut}" onclick="pycmd('{cmd}:show:{data}'); return false;" style="display: block; margin: 5px auto;">{label}</button>"""
 
 
-def get_active_webview() -> AnkiWebView:
+@dataclass
+class CardViewContext:
+    card: Optional[Card]
+    card_ord: int
+    note: Optional[Note]
+    side: str
+    web: AnkiWebView
+
+
+def get_active_card_view_context() -> CardViewContext:
     dialog = QApplication.activeModalWidget()
     window = QApplication.activeWindow()
+    card_ord = 0
+    note = None
     if isinstance(dialog, CardLayout):
-        return dialog.preview_web
-    if isinstance(window, Previewer):
-        return window._web  # pylint: disable=protected-access
-    return mw.reviewer.web
+        side = "question" if dialog.pform.preview_front.isChecked() else "answer"
+        card = getattr(dialog, "rendered_card", None)
+        card_ord = dialog.ord
+        note = dialog.note
+        web = dialog.preview_web
+    elif isinstance(window, Previewer):
+        side = window._state
+        card = window.card()
+        if card:
+            card_ord = card.ord
+            note = card.note()
+        web = window._web  # pylint: disable=protected-access
+    else:
+        side = mw.reviewer.state
+        card = mw.reviewer.card
+        if card:
+            card_ord = card.ord
+            note = card.note()
+        web = mw.reviewer.web
+
+    return CardViewContext(card, card_ord, note, side, web)
 
 
 def get_bool_filter_option(options: Dict, key: str, default: bool = True) -> bool:
@@ -63,6 +94,7 @@ def add_filter(
     delayed = get_bool_filter_option(options, "delayed", False)
     subs2srs = get_bool_filter_option(options, "subs2srs", False)
     label = options.get("label", consts.ADDON_NAME)
+    context = get_active_card_view_context()
     if delayed:
         data = dict(
             cid=ctx.card().id,
@@ -74,7 +106,7 @@ def add_filter(
             shuffle=shuffle,
             highlight=highlight,
             subs2srs=subs2srs,
-            side=mw.reviewer.state,
+            side=context.side,
         )
         data_json = json.dumps(data).replace('"', "&quot;")
         ret = TOGGLE_BUTTON.format(
@@ -95,13 +127,15 @@ def add_filter(
             highlight,
             delayed,
             subs2srs,
-            mw.reviewer.state,
+            context.card,
+            context.side,
         )
     return ret
 
 
 def show_copyaround_contents(data: str) -> None:
-    web = get_active_webview()
+    context = get_active_card_view_context()
+    web = context.web
 
     def show(rendered: bool) -> None:
         if rendered:
@@ -109,14 +143,14 @@ def show_copyaround_contents(data: str) -> None:
         options = json.loads(data)
         options["delayed"] = True
         # FIXME: cause errors if the note was not written to the database yet (e.g. in the card layouts screen opened from the add screen)
-        card = mw.col.get_card(options["cid"])
-        note = card.note()
+        note = context.note
+        card = context.card if context.card else note.cards()[context.card_ord]
         options["card"] = card
         options["note"] = note
         del options["cid"]
         contents = get_related_content(**options)
         if playback_controller := getattr(mw, "playback_controller", None):
-            playback_controller.apply_to_card_avtags(mw.reviewer.card)
+            playback_controller.apply_to_card_avtags(card)
         web.eval(
             f"""
 (() => {{
@@ -154,7 +188,7 @@ def handle_js_msg(
 
 
 def on_show_hotkey_triggered() -> None:
-    web = get_active_webview()
+    web = get_active_card_view_context().web
     web.eval(
         """
 (() => {
