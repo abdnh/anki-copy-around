@@ -41,7 +41,7 @@ def get_related_content(
     copied = ""
     count = 0
     for nid in nids:
-        if count >= max_notes:
+        if max_notes >= 0 and count >= max_notes:
             break
         if note.id == nid:
             continue
