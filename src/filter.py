@@ -106,7 +106,9 @@ def add_filter(
             shuffle=shuffle,
             highlight=highlight,
             subs2srs=subs2srs,
-            side=context.side,
+            # FIXME: this should be the side where the filter was included,
+            # but I don't know of a way to get that kind of info here
+            side="a",
         )
         data_json = json.dumps(data).replace('"', "&quot;")
         ret = TOGGLE_BUTTON.format(
@@ -128,7 +130,7 @@ def add_filter(
             delayed,
             subs2srs,
             context.card,
-            context.side,
+            side="a",
         )
     return ret
 
