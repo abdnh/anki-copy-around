@@ -2,19 +2,13 @@ import json
 import re
 from typing import Any, Dict, List, Tuple
 
-from anki.cards import Card
 from anki.hooks import field_filter
 from anki.template import TemplateRenderContext
 from aqt import mw
 from aqt.browser.previewer import Previewer
 from aqt.clayout import CardLayout
-from aqt.gui_hooks import (
-    card_will_show,
-    state_shortcuts_will_change,
-    webview_did_receive_js_message,
-)
+from aqt.gui_hooks import state_shortcuts_will_change, webview_did_receive_js_message
 from aqt.qt import *
-from aqt.sound import av_player, play
 from aqt.webview import AnkiWebView
 
 from . import consts
@@ -88,7 +82,7 @@ def add_filter(
             shortcut=TRIGGER_FILTER_BUTTON_SHORTCUT,
         )
     else:
-        ret, _ = get_related_content(
+        ret = get_related_content(
             ctx.note(),
             did,
             field_name,
@@ -103,15 +97,6 @@ def add_filter(
     return ret
 
 
-# FIXME: this approach doesn't work with multiple filters
-FILTER_AUDIOS: List[str] = []
-
-
-def play_filter_audios() -> None:
-    for audio in FILTER_AUDIOS:
-        av_player.insert_file(audio)
-
-
 def show_copyaround_contents(data: str) -> None:
     web = get_active_webview()
 
@@ -123,32 +108,32 @@ def show_copyaround_contents(data: str) -> None:
         # FIXME: cause errors if the note was not written to the database yet (e.g. in the card layouts screen opened from the add screen)
         card = mw.col.get_card(options["cid"])
         note = card.note()
+        options["card"] = card
         options["note"] = note
         del options["cid"]
-        contents, audios = get_related_content(**options)
-        global FILTER_AUDIOS
-        FILTER_AUDIOS = audios
-        if card.autoplay():
-            play_filter_audios()
+        contents = get_related_content(**options)
+        if playback_controller := getattr(mw, "playback_controller", None):
+            playback_controller.apply_to_card_avtags(card)
+            mw.reviewer.card = card
         web.eval(
             f"""
 (() => {{
-var copyAroundToggle = document.getElementById('copyaround-toggle');
-copyAroundToggle.insertAdjacentHTML('afterend', {json.dumps(contents)});
+    var copyAroundToggle = document.getElementById('copyaround-toggle');
+    copyAroundToggle.insertAdjacentHTML('afterend', {json.dumps(contents)});
 }})();
-        """
+            """
         )
 
     web.evalWithCallback(
         """
 (() => {
-var copyAroundToggle = document.getElementById('copyaround-toggle');
-if(!copyAroundToggle.dataset.rendered) {
-    copyAroundToggle.dataset.rendered = true;
-    return false;
-} else {
-    return true;
-}
+    var copyAroundToggle = document.getElementById('copyaround-toggle');
+    if(!copyAroundToggle.dataset.rendered) {
+        copyAroundToggle.dataset.rendered = true;
+        return false;
+    } else {
+        return true;
+    }
 })();""",
         show,
     )
@@ -161,17 +146,9 @@ def handle_js_msg(
         return handled
     _, subcmd, data = message.split(":", maxsplit=2)
     data = data.replace("&quot;", '"')
-    if subcmd == "play":
-        filename = data
-        play(filename)
-    elif subcmd == "show":
+    if subcmd == "show":
         show_copyaround_contents(data)
     return (True, None)
-
-
-def replay_audios() -> None:
-    mw.reviewer.replayAudio()
-    play_filter_audios()
 
 
 def on_show_hotkey_triggered() -> None:
@@ -188,22 +165,10 @@ copyAroundToggle.click();
 def modify_replay_shortcut(state: str, shortcuts: List[Tuple[str, Callable]]) -> None:
     if state != "review":
         return
-    # modify the 'r' shortcut to play our audios too
-    for i, shortcut in enumerate(shortcuts):
-        if shortcut[0] == "r":
-            shortcuts[i] = (shortcut[0], replay_audios)
-
     shortcuts.append((TRIGGER_FILTER_BUTTON_SHORTCUT, on_show_hotkey_triggered))
-
-
-def reset_filter_audios(text: str, card: Card, kind: str) -> str:
-    global FILTER_AUDIOS
-    FILTER_AUDIOS = []
-    return text
 
 
 def init_filter() -> None:
     field_filter.append(add_filter)
     webview_did_receive_js_message.append(handle_js_msg)
     state_shortcuts_will_change.append(modify_replay_shortcut)
-    card_will_show.append(reset_filter_audios)

@@ -1,13 +1,11 @@
 import random
-import re
-from typing import Iterable, List, Match, MutableSequence, Tuple, cast
+from typing import Iterable, MutableSequence, Optional, cast
 
+from anki.cards import Card
 from anki.collection import SearchNode
 from anki.decks import DeckId
 from anki.notes import Note
 from aqt import mw
-
-from . import consts
 
 try:
     from anki.utils import strip_html as stripHTML
@@ -15,13 +13,6 @@ except ImportError:
     from anki.utils import stripHTML
 
 HIGHLIGHT_COLOR = "#0000ff"
-SOUND_REF_RE = re.compile(r"\[sound:(.*?)\]")
-PLAY_BUTTON = """<a class="replay-button soundLink" href=# onclick="pycmd('{cmd}:play:{filename}'); return false;">
-    <svg class="playImage" viewBox="0 0 64 64" version="1.1">
-        <circle cx="32" cy="32" r="29" />
-        <path d="M56.502,32.301l-37.502,20.101l0.329,-40.804l37.173,20.703Z" />
-    </svg>
-</a>"""
 
 
 def get_related_content(
@@ -35,7 +26,8 @@ def get_related_content(
     highlight: bool = False,
     delayed: bool = False,
     subs2srs: bool = False,
-) -> Tuple[str, List[str]]:
+    card: Optional[Card] = None,
+) -> str:
     search_terms = [SearchNode(deck=mw.col.decks.get(did)["name"])]
     # search in all fields, then filter by chosen search field if any
     search_text = stripHTML(note[search_field].lower())
@@ -43,12 +35,11 @@ def get_related_content(
     query = mw.col.build_search_string(*search_terms)
     nids = cast(MutableSequence, mw.col.find_notes(query))
     if not nids:
-        return ("", [])
+        return ""
     if shuffle:
         random.shuffle(nids)
     copied = ""
     count = 0
-    audios = []
     for nid in nids:
         if count >= max_notes:
             break
@@ -76,17 +67,15 @@ def get_related_content(
                         search_text,
                         f'<span style="color: {HIGHLIGHT_COLOR}">{search_text}</span>',
                     )
-                if delayed:
+                if delayed and (
+                    playback_controller := getattr(mw, "playback_controller", None)
+                ):
                     # We need to process audio filenames manually in the delayed=true case
                     # because Anki's processing of them will have finished at this stage.
-                    def repl_sounds(match: Match) -> str:
-                        filename = match.group(1)
-                        audios.append(filename)
-                        return PLAY_BUTTON.format(
-                            cmd=consts.FILTER_NAME, filename=filename
-                        )
-
-                    field_contents = SOUND_REF_RE.sub(repl_sounds, field_contents)
+                    # I use my control-audio-playback add-on here.
+                    field_contents, tags = playback_controller.add_sound_tags_from_text(
+                        field_contents, "a", card.autoplay()
+                    )
                 copied_fields.append(
                     f'<span class="{css_class}">{field_contents}</span>'
                 )
@@ -103,4 +92,4 @@ def get_related_content(
             )
             count += 1
 
-    return copied, audios
+    return copied
