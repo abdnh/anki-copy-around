@@ -43,6 +43,7 @@ def add_filter(
     filter_name: str,
     ctx: TemplateRenderContext,
 ) -> str:
+
     if not filter_name.startswith(consts.FILTER_NAME):
         return field_text
     options = {}
@@ -73,6 +74,7 @@ def add_filter(
             shuffle=shuffle,
             highlight=highlight,
             subs2srs=subs2srs,
+            side=mw.reviewer.state,
         )
         data_json = json.dumps(data).replace('"', "&quot;")
         ret = TOGGLE_BUTTON.format(
@@ -93,6 +95,7 @@ def add_filter(
             highlight,
             delayed,
             subs2srs,
+            mw.reviewer.state,
         )
     return ret
 

@@ -27,6 +27,7 @@ def get_related_content(
     delayed: bool = False,
     subs2srs: bool = False,
     card: Optional[Card] = None,
+    side: str = "question",
 ) -> str:
     search_terms = [SearchNode(deck=mw.col.decks.get(did)["name"])]
     # search in all fields, then filter by chosen search field if any
@@ -74,7 +75,9 @@ def get_related_content(
                     # because Anki's processing of them will have finished at this stage.
                     # I use my control-audio-playback add-on here.
                     field_contents, tags = playback_controller.add_sound_tags_from_text(
-                        field_contents, "a", card.autoplay()
+                        field_contents,
+                        "q" if side == "question" else "a",
+                        card.autoplay(),
                     )
                 copied_fields.append(
                     f'<span class="{css_class}">{field_contents}</span>'
