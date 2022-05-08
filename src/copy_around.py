@@ -30,9 +30,12 @@ def get_related_content(
     side: str = "question",
 ) -> str:
     search_terms = [SearchNode(deck=mw.col.decks.get(did)["name"])]
-    # search in all fields, then filter by chosen search field if any
-    search_text = stripHTML(note[search_field].lower())
+    search_text = note[search_field]
     search_terms.append(search_text)
+    field_terms = []
+    for copy_from_field in copy_from_fields:
+        field_terms.append(SearchNode(field_name=copy_from_field))
+    search_terms.append(mw.col.build_search_string(*field_terms, joiner="OR"))
     query = mw.col.build_search_string(*search_terms)
     nids = cast(MutableSequence, mw.col.find_notes(query))
     if not nids:
