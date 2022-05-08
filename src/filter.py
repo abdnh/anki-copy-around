@@ -113,8 +113,7 @@ def show_copyaround_contents(data: str) -> None:
         del options["cid"]
         contents = get_related_content(**options)
         if playback_controller := getattr(mw, "playback_controller", None):
-            playback_controller.apply_to_card_avtags(card)
-            mw.reviewer.card = card
+            playback_controller.apply_to_card_avtags(mw.reviewer.card)
         web.eval(
             f"""
 (() => {{
