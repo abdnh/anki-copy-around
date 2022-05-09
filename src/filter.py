@@ -15,7 +15,7 @@ from aqt.qt import *
 from aqt.webview import AnkiWebView
 
 from . import consts
-from .copy_around import get_related_content
+from .copy_around import Subs2srsOptions, get_related_content
 
 # FIXME: doesn't work with values that contain double quotes
 FILTER_OPTION_RE = re.compile(r'((?P<key>\w+)\s*=\s*(?P<value>(".*")|\S*))')
@@ -93,6 +93,11 @@ def add_filter(
     highlight = get_bool_filter_option(options, "highlight")
     delayed = get_bool_filter_option(options, "delayed", False)
     subs2srs = get_bool_filter_option(options, "subs2srs", False)
+    subs2srs_fontsize = options.get("subs2srs-fontsize", "smaller")
+    subs2srs_info = None
+    if subs2srs:
+        subs2srs_info = Subs2srsOptions(subs2srs_fontsize)
+
     label = options.get("label", consts.ADDON_NAME)
     context = get_active_card_view_context()
     if delayed:
@@ -108,7 +113,7 @@ def add_filter(
             max_notes=count,
             shuffle=shuffle,
             highlight=highlight,
-            subs2srs=subs2srs,
+            subs2srs_info=subs2srs_info,
             # FIXME: this should be the side where the filter was included,
             # but I don't know of a way to get that kind of info here
             side="a",
@@ -132,7 +137,7 @@ def add_filter(
             shuffle,
             highlight,
             delayed,
-            subs2srs,
+            subs2srs_info,
             context.card,
             side="a",
         )

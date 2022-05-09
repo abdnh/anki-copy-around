@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 from typing import Iterable, List, MutableSequence, Optional, Union, cast
 
 from anki.cards import Card
@@ -15,6 +16,11 @@ except ImportError:
 HIGHLIGHT_COLOR = "#0000ff"
 
 
+@dataclass
+class Subs2srsOptions:
+    font_size: str
+
+
 def get_related_content(
     note: Note,
     did: DeckId,
@@ -25,7 +31,7 @@ def get_related_content(
     shuffle: bool = False,
     highlight: bool = False,
     delayed: bool = False,
-    subs2srs: bool = False,
+    subs2srs_info: Optional[Subs2srsOptions] = None,
     card: Optional[Card] = None,
     side: str = "question",
 ) -> str:
@@ -87,10 +93,16 @@ def get_related_content(
                 copied_fields.append(
                     f'<span class="{css_class}">{field_contents}</span>'
                 )
-        if subs2srs and (subs2srs_context := getattr(mw, "subs2srs_context", None)):
-            # get previous and next sub2srs recordings using the subs2srs-context add-on
-            audio_buttons = subs2srs_context.get_audio_buttons(nid)
-            copied_fields.append(audio_buttons)
+        if subs2srs_info and (
+            subs2srs_context := getattr(mw, "subs2srs_context", None)
+        ):
+            # get info from previous and next sub2srs notes using the subs2srs-context add-on
+            subs2srs_text = ""
+            audio_buttons = subs2srs_context.get_audio_buttons(nid, flip=True)
+            expressions = subs2srs_context.get_expressions(nid)
+            subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_buttons[0]}{audio_buttons[1]}{expressions[1]}</div>'
+
+            copied_fields.append(subs2srs_text)
 
         if copied_fields:
             copied += (
