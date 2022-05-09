@@ -1,6 +1,6 @@
+import dataclasses
 import json
 import re
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from anki.cards import Card
@@ -26,7 +26,7 @@ TRIGGER_FILTER_BUTTON_SHORTCUT = mw.addonManager.getConfig(__name__)[
 TOGGLE_BUTTON = """<button id="copyaround-toggle-{toggle_id}" class="copyaround-toggle" title="Shortcut: {shortcut}" onclick="pycmd('{cmd}:show:{data}'); return false;" style="display: block; margin: 5px auto;">{label}</button>"""
 
 
-@dataclass
+@dataclasses.dataclass
 class CardViewContext:
     card: Optional[Card]
     card_ord: int
@@ -113,7 +113,7 @@ def add_filter(
             max_notes=count,
             shuffle=shuffle,
             highlight=highlight,
-            subs2srs_info=subs2srs_info,
+            subs2srs_info=dataclasses.asdict(subs2srs_info),
             # FIXME: this should be the side where the filter was included,
             # but I don't know of a way to get that kind of info here
             side="a",
@@ -161,6 +161,7 @@ def show_copyaround_contents(data: str) -> None:
         options["card"] = card
         options["note"] = note
         del options["cid"]
+        options["subs2srs_info"] = Subs2srsOptions(**options["subs2srs_info"])
         contents = get_related_content(**options)
         if playback_controller := getattr(mw, "playback_controller", None):
             playback_controller.apply_to_card_avtags(card)
