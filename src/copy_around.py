@@ -32,7 +32,7 @@ def get_related_content(
     search_terms: List[Union[str, SearchNode]] = [
         SearchNode(deck=mw.col.decks.get(did)["name"])
     ]
-    search_text = note[search_field]
+    search_text = stripHTML(note[search_field])
     search_terms.append(search_text)
     field_terms = []
     for copy_from_field in copy_from_fields:
