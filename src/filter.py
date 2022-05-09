@@ -23,7 +23,7 @@ FILTER_OPTION_RE = re.compile(r'((?P<key>\w+)\s*=\s*(?P<value>(".*")|\S*))')
 TRIGGER_FILTER_BUTTON_SHORTCUT = mw.addonManager.getConfig(__name__)[
     "trigger_filter_button_shortcut"
 ]
-TOGGLE_BUTTON = """<button id="copyaround-toggle" title="Shortcut: {shortcut}" onclick="pycmd('{cmd}:show:{data}'); return false;" style="display: block; margin: 5px auto;">{label}</button>"""
+TOGGLE_BUTTON = """<button id="copyaround-toggle-{toggle_id}" class="copyaround-toggle" title="Shortcut: {shortcut}" onclick="pycmd('{cmd}:show:{data}'); return false;" style="display: block; margin: 5px auto;">{label}</button>"""
 
 
 @dataclass
@@ -47,7 +47,7 @@ def get_active_card_view_context() -> CardViewContext:
         note = dialog.note
         web = dialog.preview_web
     elif isinstance(window, Previewer):
-        side = window._state
+        side = window._state  # pylint: disable=protected-access
         card = window.card()
         if card:
             card_ord = card.ord
@@ -96,7 +96,10 @@ def add_filter(
     label = options.get("label", consts.ADDON_NAME)
     context = get_active_card_view_context()
     if delayed:
+        toggle_id = ctx.extra_state.get(consts.FILTER_NAME, 1)
+        ctx.extra_state[consts.FILTER_NAME] = toggle_id + 1
         data = dict(
+            toggle_id=toggle_id,
             cid=ctx.card().id,
             did=did,
             search_field=field_name,
@@ -112,6 +115,7 @@ def add_filter(
         )
         data_json = json.dumps(data).replace('"', "&quot;")
         ret = TOGGLE_BUTTON.format(
+            toggle_id=toggle_id,
             cmd=consts.FILTER_NAME,
             data=data_json,
             label=label,
@@ -138,11 +142,13 @@ def add_filter(
 def show_copyaround_contents(data: str) -> None:
     context = get_active_card_view_context()
     web = context.web
+    options = json.loads(data)
+    toggle_id = options["toggle_id"]
+    del options["toggle_id"]
 
     def show(rendered: bool) -> None:
         if rendered:
             return
-        options = json.loads(data)
         options["delayed"] = True
         # FIXME: cause errors if the note was not written to the database yet (e.g. in the card layouts screen opened from the add screen)
         note = context.note
@@ -156,23 +162,23 @@ def show_copyaround_contents(data: str) -> None:
         web.eval(
             f"""
 (() => {{
-    var copyAroundToggle = document.getElementById('copyaround-toggle');
+    var copyAroundToggle = document.getElementById('copyaround-toggle-{toggle_id}');
     copyAroundToggle.insertAdjacentHTML('afterend', {json.dumps(contents)});
 }})();
             """
         )
 
     web.evalWithCallback(
-        """
-(() => {
-    var copyAroundToggle = document.getElementById('copyaround-toggle');
-    if(!copyAroundToggle.dataset.rendered) {
+        f"""
+(() => {{
+    var copyAroundToggle = document.getElementById('copyaround-toggle-{toggle_id}');
+    if(!copyAroundToggle.dataset.rendered) {{
         copyAroundToggle.dataset.rendered = true;
         return false;
-    } else {
+    }} else {{
         return true;
-    }
-})();""",
+    }}
+}})();""",
         show,
     )
 
@@ -194,8 +200,10 @@ def on_show_hotkey_triggered() -> None:
     web.eval(
         """
 (() => {
-var copyAroundToggle = document.getElementById('copyaround-toggle');
-copyAroundToggle.click();
+    const copyAroundToggles = document.getElementsByClassName('copyaround-toggle');
+    for(const toggle of copyAroundToggles) {
+        toggle.click();
+    }
 })();""",
     )
 
