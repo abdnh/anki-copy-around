@@ -5,17 +5,23 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from anki.cards import Card
 from anki.hooks import field_filter
-from anki.notes import Note
+from anki.notes import Note, NoteId
 from anki.template import TemplateRenderContext
 from aqt import mw
 from aqt.browser.previewer import Previewer
 from aqt.clayout import CardLayout
 from aqt.gui_hooks import state_shortcuts_will_change, webview_did_receive_js_message
 from aqt.qt import *
+from aqt.utils import tooltip
 from aqt.webview import AnkiWebView
 
 from . import consts
-from .copy_around import Subs2srsOptions, get_related_content
+from .copy_around import (
+    CopyAroundRelated,
+    Subs2srsOptions,
+    format_note_for_saving,
+    get_related_content,
+)
 
 # FIXME: doesn't work with values that contain double quotes
 FILTER_OPTION_RE = re.compile(r'((?P<key>\w+)\s*=\s*(?P<value>(".*")|\S*))')
@@ -24,6 +30,8 @@ TRIGGER_FILTER_BUTTON_SHORTCUT = mw.addonManager.getConfig(__name__)[
     "trigger_filter_button_shortcut"
 ]
 TOGGLE_BUTTON = """<button id="copyaround-toggle-{toggle_id}" class="copyaround-toggle" title="Shortcut: {shortcut}" onclick="pycmd('{cmd}:show:{data}'); return false;" style="display: block; margin: 5px auto;">{label}</button>"""
+
+RELATED_CONTENTS: Optional[CopyAroundRelated] = None
 
 
 @dataclasses.dataclass
@@ -77,6 +85,7 @@ def add_filter(
 
     if not filter_name.startswith(consts.FILTER_NAME):
         return field_text
+    global RELATED_CONTENTS
     options = {}
     options_text = filter_name.split(maxsplit=1)[1]
     for match in FILTER_OPTION_RE.finditer(options_text):
@@ -94,6 +103,7 @@ def add_filter(
     delayed = get_bool_filter_option(options, "delayed", False)
     subs2srs = get_bool_filter_option(options, "subs2srs", False)
     subs2srs_fontsize = options.get("subs2srs-fontsize", "smaller")
+    save_field = options.get("save_field", "")
     subs2srs_info = None
     if subs2srs:
         subs2srs_info = Subs2srsOptions(subs2srs_fontsize)
@@ -117,6 +127,7 @@ def add_filter(
             # FIXME: this should be the side where the filter was included,
             # but I don't know of a way to get that kind of info here
             side="a",
+            save_field=save_field,
         )
         data_json = json.dumps(data).replace('"', "&quot;")
         ret = TOGGLE_BUTTON.format(
@@ -127,7 +138,7 @@ def add_filter(
             shortcut=TRIGGER_FILTER_BUTTON_SHORTCUT,
         )
     else:
-        ret = get_related_content(
+        ret, rel = get_related_content(
             ctx.note(),
             did,
             field_name,
@@ -140,7 +151,9 @@ def add_filter(
             subs2srs_info,
             context.card,
             side="a",
+            save_field=save_field,
         )
+        RELATED_CONTENTS = rel
     return ret
 
 
@@ -154,6 +167,7 @@ def show_copyaround_contents(data: str) -> None:
     def show(rendered: bool) -> None:
         if rendered:
             return
+        global RELATED_CONTENTS
         options["delayed"] = True
         # FIXME: cause errors if the note was not written to the database yet (e.g. in the card layouts screen opened from the add screen)
         note = context.note
@@ -162,7 +176,8 @@ def show_copyaround_contents(data: str) -> None:
         options["note"] = note
         del options["cid"]
         options["subs2srs_info"] = Subs2srsOptions(**options["subs2srs_info"])
-        contents = get_related_content(**options)
+        contents, rel = get_related_content(**options)
+        RELATED_CONTENTS = rel
         if playback_controller := getattr(mw, "playback_controller", None):
             playback_controller.apply_to_card_avtags(card)
         web.eval(
@@ -189,6 +204,22 @@ def show_copyaround_contents(data: str) -> None:
     )
 
 
+# FIXME: only works in the reviewer
+def save_related_note(nid: str, save_field: str) -> None:
+    context = get_active_card_view_context()
+    note = context.note
+    if not save_field in note:
+        tooltip(
+            f"""Field "{save_field}" doesn\'t exist in the current note.<br>
+            Please change the save_field option of the {consts.FILTER_NAME} filter from the templates screen."""
+        )
+        return
+    related_note = RELATED_CONTENTS.related_notes[NoteId(int(nid))]
+    note[save_field] += format_note_for_saving(related_note)
+    # TODO: can we somehow refresh the card display to reflect the changes in the field?
+    tooltip(f'Added content from note {nid} to field "{save_field}"')
+
+
 def handle_js_msg(
     handled: Tuple[bool, Any], message: str, context: Any
 ) -> Tuple[bool, Any]:
@@ -198,6 +229,9 @@ def handle_js_msg(
     data = data.replace("&quot;", '"')
     if subcmd == "show":
         show_copyaround_contents(data)
+    elif subcmd == "add":
+        nid, save_field = data.split(":")
+        save_related_note(nid, save_field)
     return (True, None)
 
 

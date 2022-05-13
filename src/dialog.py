@@ -162,7 +162,7 @@ class CopyAroundDialog(QDialog):
                         max=len(self.notes),
                     )
                 )
-            copied = get_related_content(
+            copied, _ = get_related_content(
                 note,
                 did,
                 search_field,
