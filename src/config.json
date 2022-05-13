@@ -5,7 +5,7 @@
     "copy_into_field": "text_vocal",
     "copy_from_deck": "Deck 2",
     "search_in_field": "Expression",
-    "copy_from_field": "Snapshot",
+    "copy_from_fields": ["Snapshot"],
     "matched_notes_limit": -1,
     "randomize_results": false,
     "trigger_filter_button_shortcut": "K"

@@ -1,5 +1,5 @@
 from concurrent.futures import Future
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import anki
 from anki.collection import SearchNode
@@ -98,21 +98,30 @@ class CopyAroundDialog(QDialog):
             self.form.matchedNotesSpinBox.setValue(matched_notes_limit)
 
         search_field = self.config["search_field"]
-        if search_field := self._get_field(self.src_fields, search_field):
+        i, search_field = self._get_field(self.src_fields, search_field)
+        if search_field:
             self.form.searchFieldComboBox.setCurrentText(search_field)
 
         copy_into_field = self.config["copy_into_field"]
-        if copy_into_field := self._get_field(self.src_fields, copy_into_field):
+        i, copy_into_field = self._get_field(self.src_fields, copy_into_field)
+        if copy_into_field:
             self.form.copyIntoFieldComboBox.setCurrentText(copy_into_field)
         else:
             self.form.copyIntoFieldComboBox.setCurrentIndex(1)
 
-        copy_from_field = self.config["copy_from_field"]
-        if copy_from_field := self._get_field(self.dest_fields, copy_from_field):
-            self.form.copyFromFieldComboBox.setCurrentText(copy_from_field)
+        copy_from_fields = self.config["copy_from_fields"]
+        for field in copy_from_fields:
+            i, field = self._get_field(self.dest_fields, field)
+            if field:
+                index = self.form.copyFromListWidget.model().createIndex(i, 0)
+                item = self.form.copyFromListWidget.itemFromIndex(index)
+                self.form.copyFromListWidget.setCurrentItem(
+                    item, QItemSelectionModel.SelectionFlag.Select
+                )
 
         search_in_field = self.config["search_in_field"]
-        if search_in_field := self._get_field(self.dest_fields, search_in_field):
+        i, search_in_field = self._get_field(self.dest_fields, search_in_field)
+        if search_in_field:
             self.form.searchInFieldCheckBox.setChecked(True)
             self.form.searchInFieldComboBox.setCurrentText(search_in_field)
 
@@ -121,11 +130,11 @@ class CopyAroundDialog(QDialog):
 
         return super().exec()
 
-    def _get_field(self, fields: List[str], key: str) -> Optional[str]:
-        for field in fields:
+    def _get_field(self, fields: List[str], key: str) -> Tuple[int, Optional[str]]:
+        for i, field in enumerate(fields):
             if key.lower() == field.lower():
-                return field
-        return None
+                return i, field
+        return -1, None
 
     def _update_dest_fields(self, dest_did: DeckId) -> None:
         self.dest_fields: List[str] = []
@@ -137,8 +146,8 @@ class CopyAroundDialog(QDialog):
             for field in note.keys():
                 if field not in self.dest_fields:
                     self.dest_fields.append(field)
-        self.form.copyFromFieldComboBox.clear()
-        self.form.copyFromFieldComboBox.addItems(self.dest_fields)
+        self.form.copyFromListWidget.clear()
+        self.form.copyFromListWidget.addItems(self.dest_fields)
         self.form.searchInFieldComboBox.clear()
         self.form.searchInFieldComboBox.addItems(self.dest_fields)
 
@@ -148,7 +157,7 @@ class CopyAroundDialog(QDialog):
         search_field: str,
         copy_into_field: str,
         search_in_field: str,
-        copy_from_field: str,
+        copy_from_fields: List[str],
         max_notes: int,
         randomize_results: bool,
     ) -> None:
@@ -167,7 +176,7 @@ class CopyAroundDialog(QDialog):
                 did,
                 search_field,
                 search_in_field,
-                [copy_from_field],
+                copy_from_fields,
                 max_notes,
                 randomize_results,
             )
@@ -186,8 +195,9 @@ class CopyAroundDialog(QDialog):
             if self.form.searchInFieldCheckBox.isChecked()
             else ""
         )
-        copy_from_field = self.dest_fields[
-            self.form.copyFromFieldComboBox.currentIndex()
+        copy_from_fields = [
+            self.dest_fields[idx.row()]
+            for idx in self.form.copyFromListWidget.selectedIndexes()
         ]
         max_notes = (
             self.form.matchedNotesSpinBox.value()
@@ -201,7 +211,7 @@ class CopyAroundDialog(QDialog):
         self.config["copy_into_field"] = copy_into_field
         self.config["copy_from_deck"] = self.mw.col.decks.get(did)["name"]
         self.config["search_in_field"] = search_in_field
-        self.config["copy_from_field"] = copy_from_field
+        self.config["copy_from_fields"] = copy_from_fields
         self.config["matched_notes_limit"] = max_notes
         self.config["randomize_results"] = randomize_results
 
@@ -226,7 +236,7 @@ class CopyAroundDialog(QDialog):
                 search_field,
                 copy_into_field,
                 search_in_field,
-                copy_from_field,
+                copy_from_fields,
                 max_notes,
                 randomize_results,
             ),
