@@ -42,6 +42,7 @@ class RelatedNote:
     nid: NoteId
     fields: Dict[str, RelatedField]
     subs2srs_text: str
+    raw_subs2srs_text: str
 
 
 @dataclass
@@ -58,12 +59,7 @@ def get_related(
     copy_from_fields: Iterable[str],
     max_notes: int = -1,
     shuffle: bool = False,
-    # highlight: bool = False,
-    # delayed: bool = False,
     subs2srs_info: Optional[Subs2srsOptions] = None,
-    # card: Optional[Card] = None,
-    # side: str = "question",
-    # save_field: Optional[str] = None,
 ) -> Tuple[str, CopyAroundRelated]:
     copyaround = CopyAroundRelated(note.id, {})
     search_terms: List[Union[str, SearchNode]] = [
@@ -100,6 +96,7 @@ def get_related(
 
         copied_fields = {}
         subs2srs_text = ""
+        raw_subs2srs_text = ""
         for copy_from_field in copy_from_fields:
             if copy_from_field in dest_note:
                 field_contents = dest_note[copy_from_field]
@@ -110,16 +107,25 @@ def get_related(
             subs2srs_context := getattr(mw, "subs2srs_context", None)
         ):
             # get info from previous and next sub2srs notes using the subs2srs-context add-on
+            # TODO: maybe factor out some of this logic to subs2srs-context
             audio_buttons = subs2srs_context.get_audio_buttons(nid, flip=True)
+            audio_filenames = [
+                subs2srs_context.get_audio_filename(nid - 1),
+                subs2srs_context.get_audio_filename(nid + 1),
+            ]
+            audio_tags = [
+                f"[sound:{filename}]" if filename else ""
+                for filename in audio_filenames
+            ]
             expressions = subs2srs_context.get_expressions(nid)
-            # subs2srs_text += (
-            #     f"{expressions[0]}{audio_buttons[0]}{audio_buttons[1]}{expressions[1]}"
-            # )
             subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_buttons[0]}{audio_buttons[1]}{expressions[1]}</div>'
+            raw_subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_tags[0]}{audio_tags[1]}{expressions[1]}</div>'
 
         if copied_fields:
             count += 1
-            related_note = RelatedNote(nid, copied_fields, subs2srs_text)
+            related_note = RelatedNote(
+                nid, copied_fields, subs2srs_text, raw_subs2srs_text
+            )
             copyaround.related_notes[nid] = related_note
 
     return search_text, copyaround
@@ -140,6 +146,7 @@ def format_note(nid: NoteId, formatted_fields: List[str]) -> str:
 
 def format_note_for_saving(note: RelatedNote) -> str:
     fields = [format_field(k, v.raw_contents) for k, v in note.fields.items()]
+    fields.append(note.raw_subs2srs_text)
     return format_note(note.nid, fields)
 
 
@@ -169,7 +176,6 @@ def get_related_content(
         subs2srs_info,
     )
     copied = ""
-    # count = 0
     for related in copyaround.related_notes.values():
         copied_fields = []
         for field_name, related_field in related.fields.items():
@@ -207,6 +213,5 @@ def get_related_content(
             copied_fields.append(related.subs2srs_text)
         if copied_fields:
             copied += format_note(related.nid, copied_fields)
-            # count += 1
 
     return copied, copyaround
