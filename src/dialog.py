@@ -2,7 +2,6 @@ from concurrent.futures import Future
 from typing import List, Optional, Tuple
 
 import anki
-from anki.collection import SearchNode
 from anki.decks import DeckId
 from anki.notes import Note
 from aqt import qtmajor
@@ -70,6 +69,7 @@ class CopyAroundDialog(QDialog):
             self.form.searchInFieldComboBox.setEnabled,
         )
         self.src_fields: List[str] = []
+        # TODO: optimize
         for note in self.notes:
             for field in note.keys():
                 if field not in self.src_fields:
@@ -149,14 +149,15 @@ class CopyAroundDialog(QDialog):
         self.dest_fields: List[str] = []
 
         def task() -> None:
-            search = self.mw.col.build_search_string(
-                SearchNode(deck=self.mw.col.decks.get(dest_did)["name"])
+            self.dest_fields = self.mw.col.db.list(
+                """
+select distinct name from fields
+  where ntid in (select id from notetypes
+    where id in (select mid from notes
+	 where id in (select nid from cards where did = ?))) order by ntid, ord
+""",
+                dest_did,
             )
-            for nid in self.mw.col.find_notes(search):
-                note = self.mw.col.get_note(nid)
-                for field in note.keys():
-                    if field not in self.dest_fields:
-                        self.dest_fields.append(field)
 
         def _on_done(fut: Future) -> None:
             try:
