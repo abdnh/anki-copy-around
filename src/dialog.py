@@ -76,9 +76,24 @@ class CopyAroundDialog(QDialog):
                     self.src_fields.append(field)
         self.form.searchFieldComboBox.addItems(self.src_fields)
         self.form.copyIntoFieldComboBox.addItems(self.src_fields)
-        self._update_dest_fields(self.deck_chooser.selectedId())
 
     def exec(self) -> int:
+        def on_fetched_dest_fields() -> None:
+            copy_from_fields = self.config["copy_from_fields"]
+            for field in copy_from_fields:
+                i, field = self._get_field(self.dest_fields, field)
+                if field:
+                    index = self.form.copyFromListWidget.model().createIndex(i, 0)
+                    item = self.form.copyFromListWidget.itemFromIndex(index)
+                    self.form.copyFromListWidget.setCurrentItem(
+                        item, QItemSelectionModel.SelectionFlag.Select
+                    )
+            search_in_field = self.config["search_in_field"]
+            i, search_in_field = self._get_field(self.dest_fields, search_in_field)
+            if search_in_field:
+                self.form.searchInFieldCheckBox.setChecked(True)
+                self.form.searchInFieldComboBox.setCurrentText(search_in_field)
+
         mids = set(note.mid for note in self.notes)
         if len(mids) > 1:
             showWarning(
@@ -90,7 +105,13 @@ class CopyAroundDialog(QDialog):
         copy_from_deck = self.mw.col.decks.by_name(self.config["copy_from_deck"])
         if copy_from_deck:
             self.deck_chooser.selected_deck_id = copy_from_deck["id"]
-            self._update_dest_fields(copy_from_deck["id"])
+            self._update_dest_fields(
+                copy_from_deck["id"], on_done=on_fetched_dest_fields
+            )
+        else:
+            self._update_dest_fields(
+                self.deck_chooser.selectedId(), on_done=on_fetched_dest_fields
+            )
 
         matched_notes_limit = self.config["matched_notes_limit"]
         if matched_notes_limit > 0:
@@ -109,22 +130,6 @@ class CopyAroundDialog(QDialog):
         else:
             self.form.copyIntoFieldComboBox.setCurrentIndex(1)
 
-        copy_from_fields = self.config["copy_from_fields"]
-        for field in copy_from_fields:
-            i, field = self._get_field(self.dest_fields, field)
-            if field:
-                index = self.form.copyFromListWidget.model().createIndex(i, 0)
-                item = self.form.copyFromListWidget.itemFromIndex(index)
-                self.form.copyFromListWidget.setCurrentItem(
-                    item, QItemSelectionModel.SelectionFlag.Select
-                )
-
-        search_in_field = self.config["search_in_field"]
-        i, search_in_field = self._get_field(self.dest_fields, search_in_field)
-        if search_in_field:
-            self.form.searchInFieldCheckBox.setChecked(True)
-            self.form.searchInFieldComboBox.setCurrentText(search_in_field)
-
         randomize_results = self.config["randomize_results"]
         self.form.randomizeCheckBox.setChecked(randomize_results)
 
@@ -136,20 +141,36 @@ class CopyAroundDialog(QDialog):
                 return i, field
         return -1, None
 
-    def _update_dest_fields(self, dest_did: DeckId) -> None:
+    def _update_dest_fields(
+        self, dest_did: DeckId, on_done: Optional[Callable[[], None]] = None
+    ) -> None:
+        self.mw.progress.start(label="Getting field names...")
+        self.mw.progress.set_title(consts.ADDON_NAME)
         self.dest_fields: List[str] = []
-        search = self.mw.col.build_search_string(
-            SearchNode(deck=self.mw.col.decks.get(dest_did)["name"])
-        )
-        for nid in self.mw.col.find_notes(search):
-            note = self.mw.col.get_note(nid)
-            for field in note.keys():
-                if field not in self.dest_fields:
-                    self.dest_fields.append(field)
-        self.form.copyFromListWidget.clear()
-        self.form.copyFromListWidget.addItems(self.dest_fields)
-        self.form.searchInFieldComboBox.clear()
-        self.form.searchInFieldComboBox.addItems(self.dest_fields)
+
+        def task() -> None:
+            search = self.mw.col.build_search_string(
+                SearchNode(deck=self.mw.col.decks.get(dest_did)["name"])
+            )
+            for nid in self.mw.col.find_notes(search):
+                note = self.mw.col.get_note(nid)
+                for field in note.keys():
+                    if field not in self.dest_fields:
+                        self.dest_fields.append(field)
+
+        def _on_done(fut: Future) -> None:
+            try:
+                fut.result()
+            finally:
+                self.mw.progress.finish()
+            self.form.copyFromListWidget.clear()
+            self.form.copyFromListWidget.addItems(self.dest_fields)
+            self.form.searchInFieldComboBox.clear()
+            self.form.searchInFieldComboBox.addItems(self.dest_fields)
+            if on_done:
+                on_done()
+
+        self.mw.taskman.run_in_background(task, on_done=_on_done)
 
     def _process_notes(
         self,
