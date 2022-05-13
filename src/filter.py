@@ -26,9 +26,8 @@ from .copy_around import (
 # FIXME: doesn't work with values that contain double quotes
 FILTER_OPTION_RE = re.compile(r'((?P<key>\w+)\s*=\s*(?P<value>(".*")|\S*))')
 
-TRIGGER_FILTER_BUTTON_SHORTCUT = mw.addonManager.getConfig(__name__)[
-    "trigger_filter_button_shortcut"
-]
+CONFIG = mw.addonManager.getConfig(__name__)
+TRIGGER_FILTER_BUTTON_SHORTCUT = CONFIG["trigger_filter_button_shortcut"]
 TOGGLE_BUTTON = """<button id="copyaround-toggle-{toggle_id}" class="copyaround-toggle" title="Shortcut: {shortcut}" onclick="pycmd('{cmd}:show:{data}'); return false;" style="display: block; margin: 5px auto;">{label}</button>"""
 
 RELATED_CONTENTS: Optional[CopyAroundRelated] = None
@@ -104,9 +103,10 @@ def add_filter(
     subs2srs = get_bool_filter_option(options, "subs2srs", False)
     subs2srs_fontsize = options.get("subs2srs-fontsize", "smaller")
     save_field = options.get("save_field", "")
+    save_subs2srs = CONFIG["save_subs2srs"]
     subs2srs_info = None
     if subs2srs:
-        subs2srs_info = Subs2srsOptions(subs2srs_fontsize)
+        subs2srs_info = Subs2srsOptions(subs2srs_fontsize, save_subs2srs)
 
     label = options.get("label", consts.ADDON_NAME)
     context = get_active_card_view_context()

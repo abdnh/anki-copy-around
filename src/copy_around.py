@@ -26,6 +26,8 @@ ADD_BUTTON = """<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" f
 @dataclass
 class Subs2srsOptions:
     font_size: str
+    # whether to include subs2srs context when clicking the add button besides a context line in the filter
+    save: bool
 
 
 @dataclass
@@ -119,7 +121,8 @@ def get_related(
             ]
             expressions = subs2srs_context.get_expressions(nid)
             subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_buttons[0]}{audio_buttons[1]}{expressions[1]}</div>'
-            raw_subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_tags[0]}{audio_tags[1]}{expressions[1]}</div>'
+            if subs2srs_info.save:
+                raw_subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_tags[0]}{audio_tags[1]}{expressions[1]}</div>'
 
         if copied_fields:
             count += 1

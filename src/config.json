@@ -8,5 +8,6 @@
     "copy_from_fields": ["Snapshot"],
     "matched_notes_limit": -1,
     "randomize_results": false,
-    "trigger_filter_button_shortcut": "K"
+    "trigger_filter_button_shortcut": "K",
+    "save_subs2srs": true
 }
