@@ -10,6 +10,7 @@ from anki.template import TemplateRenderContext
 from aqt import mw
 from aqt.browser.previewer import Previewer
 from aqt.clayout import CardLayout
+from aqt.editor import Editor
 from aqt.gui_hooks import state_shortcuts_will_change, webview_did_receive_js_message
 from aqt.qt import *
 from aqt.utils import tooltip
@@ -41,6 +42,7 @@ class CardViewContext:
     note: Optional[Note]
     side: str
     web: AnkiWebView
+    editor: Optional[Editor]
 
 
 def get_active_card_view_context() -> CardViewContext:
@@ -54,6 +56,7 @@ def get_active_card_view_context() -> CardViewContext:
         card_ord = dialog.ord
         note = dialog.note
         web = dialog.preview_web
+        editor = None
     elif isinstance(window, Previewer):
         side = window._state  # pylint: disable=protected-access
         card = window.card()
@@ -61,6 +64,10 @@ def get_active_card_view_context() -> CardViewContext:
             card_ord = card.ord
             note = card.note()
         web = window._web  # pylint: disable=protected-access
+        if browser := getattr(window, "_parent", None):
+            editor = browser.editor
+        else:
+            editor = None
     else:
         side = mw.reviewer.state
         card = mw.reviewer.card
@@ -68,8 +75,9 @@ def get_active_card_view_context() -> CardViewContext:
             card_ord = card.ord
             note = card.note()
         web = mw.reviewer.web
+        editor = None
 
-    return CardViewContext(card, card_ord, note, side, web)
+    return CardViewContext(card, card_ord, note, side, web, editor)
 
 
 def get_bool_filter_option(options: Dict, key: str, default: bool = True) -> bool:
@@ -229,8 +237,10 @@ def save_related_note(nid: str, filter_id: int, save_field: str) -> None:
         return
     related_note = FILTER_CONTEXT[filter_id].related_notes[NoteId(int(nid))]
     note[save_field] += format_note_for_saving(related_note)
-    # TODO: can we somehow refresh the card display to reflect the changes in the field?
     tooltip(f'Added content from note {nid} to field "{save_field}"')
+    note.flush()
+    if context.editor:
+        context.editor.set_note(note)
 
 
 def handle_js_msg(
