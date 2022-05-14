@@ -53,6 +53,14 @@ class CopyAroundRelated:
     related_notes: Dict[NoteId, RelatedNote]
 
 
+@dataclass
+class SaveInfo:
+    """Data used for saving a context line via the Add button in the filter."""
+
+    field: str
+    filter_id: int
+
+
 def get_related(
     note: Note,
     did: DeckId,
@@ -166,7 +174,7 @@ def get_related_content(
     subs2srs_info: Optional[Subs2srsOptions] = None,
     card: Optional[Card] = None,
     side: str = "question",
-    save_field: Optional[str] = None,
+    save_info: Optional[SaveInfo] = None,
 ) -> Tuple[str, CopyAroundRelated]:
     search_text, copyaround = get_related(
         note,
@@ -204,12 +212,12 @@ def get_related_content(
                 )
             related_field.processed_contents = processed_contents
             copied_fields.append(format_field(field_name, processed_contents))
-        if save_field:
+        if save_info:
             copied_fields.append(
                 f"""<a class="copyaround-add-button"
                 style="text-decoration: none; display: inline-flex; vertical-align: middle; margin: 3px;"
                 href=#
-                onclick="pycmd('{consts.FILTER_NAME}:add:{related.nid}:{save_field}'); return false;">{ADD_BUTTON}</a>"""
+                onclick="pycmd('{consts.FILTER_NAME}:add:{related.nid}:{save_info.filter_id}:{save_info.field}'); return false;">{ADD_BUTTON}</a>"""
             )
 
         if related.subs2srs_text:
