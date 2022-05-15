@@ -119,9 +119,7 @@ def add_filter(
     subs2srs = get_bool_filter_option(options, "subs2srs", False)
     subs2srs_fontsize = options.get("subs2srs-fontsize", "smaller")
     save_field = options.get("save_field", "")
-    save_info = None
-    if save_field:
-        save_info = SaveInfo(save_field, filter_id)
+    save_info = SaveInfo(save_field, filter_id)
     save_subs2srs = CONFIG["save_subs2srs"]
     subs2srs_info = None
     if subs2srs:
@@ -140,7 +138,7 @@ def add_filter(
             max_notes=count,
             shuffle=shuffle,
             highlight=highlight,
-            subs2srs_info=dataclasses.asdict(subs2srs_info),
+            subs2srs_info=dataclasses.asdict(subs2srs_info) if subs2srs_info else {},
             # FIXME: this should be the side where the filter was included,
             # but I don't know of a way to get that kind of info here
             side="a",
@@ -195,7 +193,8 @@ def show_copyaround_contents(data: str) -> None:
         options["card"] = card
         options["note"] = note
         del options["cid"]
-        options["subs2srs_info"] = Subs2srsOptions(**options["subs2srs_info"])
+        if options["subs2srs_info"]:
+            options["subs2srs_info"] = Subs2srsOptions(**options["subs2srs_info"])
         options["save_info"] = SaveInfo(**options["save_info"])
         contents, rel = get_related_content(**options)
         FILTER_CONTEXT[options["save_info"].filter_id] = rel
