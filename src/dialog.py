@@ -83,11 +83,13 @@ class CopyAroundDialog(QDialog):
             for field in copy_from_fields:
                 i, field = self._get_field(self.dest_fields, field)
                 if field:
-                    index = self.form.copyFromListWidget.model().createIndex(i, 0)
-                    item = self.form.copyFromListWidget.itemFromIndex(index)
-                    self.form.copyFromListWidget.setCurrentItem(
-                        item, QItemSelectionModel.SelectionFlag.Select
+                    items = self.form.copyFromListWidget.findItems(
+                        field, Qt.MatchFlag.MatchFixedString
                     )
+                    if items:
+                        self.form.copyFromListWidget.setCurrentItem(
+                            items[0], QItemSelectionModel.SelectionFlag.Select
+                        )
             search_in_field = self.config["search_in_field"]
             i, search_in_field = self._get_field(self.dest_fields, search_in_field)
             if search_in_field:
