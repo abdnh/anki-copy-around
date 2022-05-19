@@ -212,7 +212,7 @@ def get_related_content(
                 )
             related_field.processed_contents = processed_contents
             copied_fields.append(format_field(field_name, processed_contents))
-        if save_info.field:
+        if save_info and save_info.field:
             copied_fields.append(
                 f"""<a class="copyaround-add-button"
                 style="text-decoration: none; display: inline-flex; vertical-align: middle; margin: 3px;"
