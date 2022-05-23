@@ -1,6 +1,17 @@
 import random
+import re
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, MutableSequence, Optional, Tuple, Union, cast
+from typing import (
+    Dict,
+    Iterable,
+    List,
+    Match,
+    MutableSequence,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from anki.cards import Card
 from anki.collection import SearchNode
@@ -15,6 +26,7 @@ except ImportError:
 
 from . import consts
 
+CLOZE_HTML = """<span class="cloze" data-text={text} onmouseover="this.textContent = this.dataset.text;" onmouseout="this.textContent = '[...]';">[...]</span>"""
 HIGHLIGHT_COLOR = "#0000ff"
 # Credit: adapted from  https://icons.getbootstrap.com/icons/plus-circle/
 ADD_BUTTON = """<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#414141" class="bi bi-plus-circle" viewBox="0 0 16 16">
@@ -170,6 +182,7 @@ def get_related_content(
     max_notes: int = -1,
     shuffle: bool = False,
     highlight: bool = False,
+    cloze: bool = False,
     delayed: bool = False,
     subs2srs_info: Optional[Subs2srsOptions] = None,
     card: Optional[Card] = None,
@@ -191,14 +204,19 @@ def get_related_content(
         copied_fields = []
         for field_name, related_field in related.fields.items():
             processed_contents = related_field.processed_contents
-            if highlight:
-                # FIXME: do not touch filenames inside [sound:foo.mp3]
-                processed_contents = processed_contents.replace(
-                    search_text,
-                    f'<span style="color: {HIGHLIGHT_COLOR}">{search_text}</span>',
-                )
-                # include highlight with "raw" contents
-                related_field.raw_contents = processed_contents
+
+            def wrap(match: Match) -> str:
+                text = match.group(0)
+                if cloze:
+                    text = CLOZE_HTML.format(text=text)
+                if highlight:
+                    text = f'<span style="color: {HIGHLIGHT_COLOR}">{text}</span>'
+                return text
+
+            # FIXME: do not touch filenames inside [sound:foo.mp3]
+            processed_contents = re.sub(
+                f"(?i){re.escape(search_text)}", wrap, processed_contents
+            )
             if delayed and (
                 playback_controller := getattr(mw, "playback_controller", None)
             ):

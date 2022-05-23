@@ -115,6 +115,7 @@ def add_filter(
     count = int(options.get("count", 1))
     shuffle = get_bool_filter_option(options, "shuffle")
     highlight = get_bool_filter_option(options, "highlight")
+    cloze = get_bool_filter_option(options, "cloze", False)
     delayed = get_bool_filter_option(options, "delayed", False)
     subs2srs = get_bool_filter_option(options, "subs2srs", False)
     subs2srs_fontsize = options.get("subs2srs-fontsize", "smaller")
@@ -138,6 +139,7 @@ def add_filter(
             max_notes=count,
             shuffle=shuffle,
             highlight=highlight,
+            cloze=cloze,
             subs2srs_info=dataclasses.asdict(subs2srs_info) if subs2srs_info else {},
             # FIXME: this should be the side where the filter was included,
             # but I don't know of a way to get that kind of info here
@@ -163,6 +165,7 @@ def add_filter(
             count,
             shuffle,
             highlight,
+            cloze,
             delayed,
             subs2srs_info,
             context.card,
