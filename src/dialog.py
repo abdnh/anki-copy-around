@@ -58,7 +58,7 @@ class CopyAroundDialog(QDialog):
             self.deck_chooser = MyDeckChooser(
                 self.mw, self.form.deckChooser, label=False  # type: ignore
             )
-            qconnect(MyDeckChooser.onDeckChanged, self._update_dest_fields)
+            qconnect(self.deck_chooser.onDeckChanged, self._update_dest_fields)
         qconnect(self.form.copyButton.clicked, self.on_copy)
         qconnect(
             self.form.matchedNotesLimitCheckBox.toggled,
