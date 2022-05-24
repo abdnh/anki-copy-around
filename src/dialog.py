@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 import anki
 from anki.decks import DeckId
 from anki.notes import Note
+from anki.utils import ids2str
 from aqt import qtmajor
 from aqt.deckchooser import DeckChooser
 from aqt.main import AnkiQt
@@ -151,14 +152,16 @@ class CopyAroundDialog(QDialog):
         self.dest_fields: List[str] = []
 
         def task() -> None:
+            dids = [dest_did]
+            for _, id in self.mw.col.decks.children(dest_did):
+                dids.append(id)
             self.dest_fields = self.mw.col.db.list(
-                """
+                f"""
 select distinct name from fields
   where ntid in (select id from notetypes
     where id in (select mid from notes
-	 where id in (select nid from cards where did = ?))) order by ntid, ord
-""",
-                dest_did,
+	 where id in (select nid from cards where did in {ids2str(dids)}))) order by ntid, ord
+"""
             )
 
         def _on_done(fut: Future) -> None:
