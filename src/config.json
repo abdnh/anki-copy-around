@@ -9,5 +9,6 @@
     "matched_notes_limit": -1,
     "randomize_results": false,
     "trigger_filter_button_shortcut": "K",
-    "save_subs2srs": true
+    "save_subs2srs": true,
+    "other_collection_name": ""
 }

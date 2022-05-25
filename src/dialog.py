@@ -180,7 +180,7 @@ select distinct name from fields
 
     def _process_notes(
         self,
-        did: DeckId,
+        deck: str,
         search_field: str,
         copy_into_field: str,
         search_in_field: str,
@@ -200,7 +200,7 @@ select distinct name from fields
                 )
             copied, _ = get_related_content(
                 note,
-                did,
+                deck,
                 search_field,
                 search_in_field,
                 copy_from_fields,
@@ -216,7 +216,7 @@ select distinct name from fields
         copy_into_field = self.src_fields[
             self.form.copyIntoFieldComboBox.currentIndex()
         ]
-        did = self.deck_chooser.selectedId()
+        deck = self.deck_chooser.selected_deck_name()
         search_in_field = (
             self.dest_fields[self.form.searchInFieldComboBox.currentIndex()]
             if self.form.searchInFieldCheckBox.isChecked()
@@ -236,7 +236,7 @@ select distinct name from fields
         # save options
         self.config["search_field"] = search_field
         self.config["copy_into_field"] = copy_into_field
-        self.config["copy_from_deck"] = self.mw.col.decks.get(did)["name"]
+        self.config["copy_from_deck"] = deck
         self.config["search_in_field"] = search_in_field
         self.config["copy_from_fields"] = copy_from_fields
         self.config["matched_notes_limit"] = max_notes
@@ -259,7 +259,7 @@ select distinct name from fields
         self.mw.progress.set_title(consts.ADDON_NAME)
         self.mw.taskman.run_in_background(
             lambda: self._process_notes(
-                did,
+                deck,
                 search_field,
                 copy_into_field,
                 search_in_field,

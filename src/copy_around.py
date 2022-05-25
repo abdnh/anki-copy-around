@@ -14,8 +14,7 @@ from typing import (
 )
 
 from anki.cards import Card
-from anki.collection import SearchNode
-from anki.decks import DeckId
+from anki.collection import Collection, SearchNode
 from anki.notes import Note, NoteId
 from aqt import mw
 
@@ -75,26 +74,32 @@ class SaveInfo:
 
 def get_related(
     note: Note,
-    did: DeckId,
+    deck: str,
     search_field: str,
     search_in_field: str,
     copy_from_fields: Iterable[str],
     max_notes: int = -1,
     shuffle: bool = False,
     subs2srs_info: Optional[Subs2srsOptions] = None,
+    other_col: Optional[Collection] = None,
 ) -> Tuple[str, CopyAroundRelated]:
+
     copyaround = CopyAroundRelated(note.id, {})
-    search_terms: List[Union[str, SearchNode]] = [
-        SearchNode(deck=mw.col.decks.get(did)["name"])
-    ]
+    search_terms: List[Union[str, SearchNode]] = []
+    if other_col:
+        col = other_col
+    else:
+        col = mw.col
+        search_terms.append(SearchNode(deck=deck))
+
     search_text = stripHTML(note[search_field])
     search_terms.append(search_text)
     field_terms = []
     for copy_from_field in copy_from_fields:
         field_terms.append(SearchNode(field_name=copy_from_field))
-    search_terms.append(mw.col.build_search_string(*field_terms, joiner="OR"))
-    query = mw.col.build_search_string(*search_terms)
-    nids = cast(MutableSequence, mw.col.find_notes(query))
+    search_terms.append(col.build_search_string(*field_terms, joiner="OR"))
+    query = col.build_search_string(*search_terms)
+    nids = cast(MutableSequence, col.find_notes(query))
     if not nids:
         return "", copyaround
     if shuffle:
@@ -105,7 +110,7 @@ def get_related(
             break
         if note.id == nid:
             continue
-        dest_note = mw.col.get_note(nid)
+        dest_note = col.get_note(nid)
         # filter by chosen field
         if search_in_field and (
             search_in_field not in dest_note
@@ -175,7 +180,7 @@ def format_note_for_saving(note: RelatedNote) -> str:
 
 def get_related_content(
     note: Note,
-    did: DeckId,
+    deck: str,
     search_field: str,
     search_in_field: str,
     copy_from_fields: Iterable[str],
@@ -188,16 +193,18 @@ def get_related_content(
     card: Optional[Card] = None,
     side: str = "question",
     save_info: Optional[SaveInfo] = None,
+    other_col: Optional[Collection] = None,
 ) -> Tuple[str, CopyAroundRelated]:
     search_text, copyaround = get_related(
         note,
-        did,
+        deck,
         search_field,
         search_in_field,
         copy_from_fields,
         max_notes,
         shuffle,
         subs2srs_info,
+        other_col,
     )
     copied = ""
     for related in copyaround.related_notes.values():

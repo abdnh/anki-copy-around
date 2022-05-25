@@ -28,8 +28,7 @@ from .copy_around import (
 # FIXME: doesn't work with values that contain double quotes
 FILTER_OPTION_RE = re.compile(r'((?P<key>\w+)\s*=\s*(?P<value>(".*")|\S*))')
 
-CONFIG = mw.addonManager.getConfig(__name__)
-TRIGGER_FILTER_BUTTON_SHORTCUT = CONFIG["trigger_filter_button_shortcut"]
+TRIGGER_FILTER_BUTTON_SHORTCUT = consts.CONFIG["trigger_filter_button_shortcut"]
 TOGGLE_BUTTON = """<button id="copyaround-toggle-{toggle_id}" class="copyaround-toggle" title="Shortcut: {shortcut}" onclick="pycmd('{cmd}:show:{data}'); return false;" style="display: block; margin: 5px auto;">{label}</button>"""
 
 FILTER_CONTEXT: List[CopyAroundRelated] = []
@@ -109,7 +108,7 @@ def add_filter(
         value = pair["value"].strip('"')
         options[key] = value
 
-    did = mw.col.decks.id(options["deck"])
+    deck = options.get("deck", "")
     search_in = options.get("search_in", "")
     leech_from = options["leech_from"].split(",")
     count = int(options.get("count", 1))
@@ -118,10 +117,11 @@ def add_filter(
     cloze = get_bool_filter_option(options, "cloze", False)
     delayed = get_bool_filter_option(options, "delayed", False)
     subs2srs = get_bool_filter_option(options, "subs2srs", False)
+    use_other_col = get_bool_filter_option(options, "other_col", False)
     subs2srs_fontsize = options.get("subs2srs-fontsize", "smaller")
     save_field = options.get("save_field", "")
     save_info = SaveInfo(save_field, filter_id)
-    save_subs2srs = CONFIG["save_subs2srs"]
+    save_subs2srs = consts.CONFIG["save_subs2srs"]
     subs2srs_info = None
     if subs2srs:
         subs2srs_info = Subs2srsOptions(subs2srs_fontsize, save_subs2srs)
@@ -132,7 +132,7 @@ def add_filter(
         data = dict(
             toggle_id=filter_id,
             cid=ctx.card().id,
-            did=did,
+            deck=deck,
             search_field=field_name,
             search_in_field=search_in,
             copy_from_fields=leech_from,
@@ -145,6 +145,7 @@ def add_filter(
             # but I don't know of a way to get that kind of info here
             side="a",
             save_info=dataclasses.asdict(save_info),
+            use_other_col=use_other_col,
         )
         data_json = json.dumps(data).replace('"', "&quot;")
         ret = TOGGLE_BUTTON.format(
@@ -156,9 +157,12 @@ def add_filter(
         )
         FILTER_CONTEXT.append(CopyAroundRelated(ctx.note().id, {}))
     else:
+        other_col = None
+        if use_other_col:
+            other_col = mw.copyaround_colman.col
         ret, rel = get_related_content(
             ctx.note(),
-            did,
+            deck,
             field_name,
             search_in,
             leech_from,
@@ -171,6 +175,7 @@ def add_filter(
             context.card,
             side="a",
             save_info=save_info,
+            other_col=other_col,
         )
         FILTER_CONTEXT.append(rel)
 
@@ -199,6 +204,11 @@ def show_copyaround_contents(data: str) -> None:
         if options["subs2srs_info"]:
             options["subs2srs_info"] = Subs2srsOptions(**options["subs2srs_info"])
         options["save_info"] = SaveInfo(**options["save_info"])
+        other_col = None
+        if options["use_other_col"]:
+            other_col = mw.copyaround_colman.col
+        del options["use_other_col"]
+        options["other_col"] = other_col
         contents, rel = get_related_content(**options)
         FILTER_CONTEXT[options["save_info"].filter_id] = rel
         if playback_controller := getattr(mw, "playback_controller", None):
