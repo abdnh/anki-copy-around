@@ -178,12 +178,16 @@ def get_related(
                     # FIXME: find a better way to do this
                     filenames = col.media.filesInStr(mid, contents)
                     for filename in filenames:
-                        shutil.copy(
-                            os.path.join(
-                                os.path.dirname(col.path), "collection.media", filename
-                            ),
-                            mw.col.media.dir(),
-                        )
+                        dest_file = os.path.join(mw.col.media.dir(), filename)
+                        if not os.path.exists(dest_file):
+                            shutil.copy(
+                                os.path.join(
+                                    os.path.dirname(col.path),
+                                    "collection.media",
+                                    filename,
+                                ),
+                                dest_file,
+                            )
                 copied_fields[copy_from_field] = RelatedField(
                     copy_from_field, contents, contents
                 )
