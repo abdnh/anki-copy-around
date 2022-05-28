@@ -180,14 +180,17 @@ def get_related(
                     for filename in filenames:
                         dest_file = os.path.join(mw.col.media.dir(), filename)
                         if not os.path.exists(dest_file):
-                            shutil.copy(
-                                os.path.join(
-                                    os.path.dirname(col.path),
-                                    "collection.media",
-                                    filename,
-                                ),
-                                dest_file,
-                            )
+                            try:
+                                shutil.copy(
+                                    os.path.join(
+                                        os.path.dirname(col.path),
+                                        "collection.media",
+                                        filename,
+                                    ),
+                                    dest_file,
+                                )
+                            except FileNotFoundError:
+                                pass
                 copied_fields[copy_from_field] = RelatedField(
                     copy_from_field, contents, contents
                 )
