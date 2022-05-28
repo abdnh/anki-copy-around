@@ -110,6 +110,8 @@ def get_related(
     else:
         col = mw.col
     notetype = col.models.by_name(notetype_name)
+    if not notetype:
+        return "", copyaround
     mid = notetype["id"]
     field_ords = {}
     for f in notetype["flds"]:
