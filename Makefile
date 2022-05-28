@@ -1,4 +1,4 @@
-.PHONY: all forms zip clean fix mypy pylint pylint install
+.PHONY: all forms zip clean fix mypy pylint install
 all: zip
 
 forms: src/forms/form_qt5.py src/forms/form_qt6.py

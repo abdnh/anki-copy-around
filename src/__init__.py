@@ -1,3 +1,5 @@
+import re
+
 from aqt import gui_hooks, mw
 
 from . import consts

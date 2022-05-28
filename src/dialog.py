@@ -2,12 +2,11 @@ from concurrent.futures import Future
 from typing import List, Optional, Tuple
 
 import anki
-from anki.decks import DeckId
+from anki.models import NotetypeId
 from anki.notes import Note
-from anki.utils import ids2str
 from aqt import qtmajor
-from aqt.deckchooser import DeckChooser
 from aqt.main import AnkiQt
+from aqt.notetypechooser import NotetypeChooser
 from aqt.qt import *
 from aqt.utils import showWarning
 
@@ -26,15 +25,6 @@ ANKI_POINT_VERSION = int(anki.version.split(".")[-1])  # type: ignore
 PROGRESS_LABEL = "Processed {count} out of {total} note(s)"
 
 
-class MyDeckChooser(DeckChooser):
-
-    onDeckChanged = pyqtSignal(object)
-
-    def choose_deck(self) -> None:
-        super().choose_deck()
-        self.onDeckChanged.emit(self.selectedId())
-
-
 class CopyAroundDialog(QDialog):
     def __init__(self, mw: AnkiQt, parent: QWidget, notes: List[Note]):
         super().__init__(parent)
@@ -47,19 +37,13 @@ class CopyAroundDialog(QDialog):
         self.form = Ui_Dialog()
         self.form.setupUi(self)
         self.setWindowTitle(consts.ADDON_NAME)
-        # StudyDeck, which is used by DeckChooser, is asynchronous in 2.1.50
-        if ANKI_POINT_VERSION >= 50:
-            self.deck_chooser = MyDeckChooser(
-                self.mw,
-                self.form.deckChooser,  # type: ignore
-                label=False,
-                on_deck_changed=self._update_dest_fields,
-            )
-        else:
-            self.deck_chooser = MyDeckChooser(
-                self.mw, self.form.deckChooser, label=False  # type: ignore
-            )
-            qconnect(self.deck_chooser.onDeckChanged, self._update_dest_fields)
+        self.notetype_chooser = NotetypeChooser(
+            mw=self.mw,
+            widget=self.form.notetypeChooser,
+            show_prefix_label=False,
+            starting_notetype_id=self.mw.col.models.current()["id"],
+            on_notetype_changed=self._update_dest_fields,
+        )
         qconnect(self.form.copyButton.clicked, self.on_copy)
         qconnect(
             self.form.matchedNotesLimitCheckBox.toggled,
@@ -79,24 +63,6 @@ class CopyAroundDialog(QDialog):
         self.form.copyIntoFieldComboBox.addItems(self.src_fields)
 
     def exec(self) -> int:
-        def on_fetched_dest_fields() -> None:
-            copy_from_fields = self.config["copy_from_fields"]
-            for field in copy_from_fields:
-                i, field = self._get_field(self.dest_fields, field)
-                if field:
-                    items = self.form.copyFromListWidget.findItems(
-                        field, Qt.MatchFlag.MatchFixedString
-                    )
-                    if items:
-                        self.form.copyFromListWidget.setCurrentItem(
-                            items[0], QItemSelectionModel.SelectionFlag.Select
-                        )
-            search_in_field = self.config["search_in_field"]
-            i, search_in_field = self._get_field(self.dest_fields, search_in_field)
-            if search_in_field:
-                self.form.searchInFieldCheckBox.setChecked(True)
-                self.form.searchInFieldComboBox.setCurrentText(search_in_field)
-
         mids = set(note.mid for note in self.notes)
         if len(mids) > 1:
             showWarning(
@@ -105,16 +71,34 @@ class CopyAroundDialog(QDialog):
                 title=consts.ADDON_NAME,
             )
             return 0
-        copy_from_deck = self.mw.col.decks.by_name(self.config["copy_from_deck"])
-        if copy_from_deck:
-            self.deck_chooser.selected_deck_id = copy_from_deck["id"]
-            self._update_dest_fields(
-                copy_from_deck["id"], on_done=on_fetched_dest_fields
-            )
+        copy_from_notetype = self.mw.col.models.by_name(
+            self.config["copy_from_notetype"]
+        )
+        if copy_from_notetype:
+            self.notetype_chooser.selected_notetype_id = copy_from_notetype["id"]
+            self._update_dest_fields(copy_from_notetype["id"])
         else:
             self._update_dest_fields(
-                self.deck_chooser.selectedId(), on_done=on_fetched_dest_fields
+                self.notetype_chooser.selected_notetype_id,
             )
+
+        copy_from_fields = self.config["copy_from_fields"]
+        for field in copy_from_fields:
+            _, field = self._get_field(self.dest_fields, field)
+            if field:
+                items = self.form.copyFromListWidget.findItems(
+                    field, Qt.MatchFlag.MatchFixedString  # pylint: disable=no-member
+                )
+                if items:
+                    self.form.copyFromListWidget.setCurrentItem(
+                        items[0],
+                        QItemSelectionModel.SelectionFlag.Select,  # pylint: disable=no-member
+                    )
+        search_in_field = self.config["search_in_field"]
+        i, search_in_field = self._get_field(self.dest_fields, search_in_field)
+        if search_in_field:
+            self.form.searchInFieldCheckBox.setChecked(True)
+            self.form.searchInFieldComboBox.setCurrentText(search_in_field)
 
         matched_notes_limit = self.config["matched_notes_limit"]
         if matched_notes_limit > 0:
@@ -144,43 +128,20 @@ class CopyAroundDialog(QDialog):
                 return i, field
         return -1, None
 
-    def _update_dest_fields(
-        self, dest_did: DeckId, on_done: Optional[Callable[[], None]] = None
-    ) -> None:
-        self.mw.progress.start(label="Getting field names...")
-        self.mw.progress.set_title(consts.ADDON_NAME)
+    def _update_dest_fields(self, mid: NotetypeId) -> None:
         self.dest_fields: List[str] = []
-
-        def task() -> None:
-            dids = [dest_did]
-            for _, id in self.mw.col.decks.children(dest_did):
-                dids.append(id)
-            self.dest_fields = self.mw.col.db.list(
-                f"""
-select distinct name from fields
-  where ntid in (select id from notetypes
-    where id in (select mid from notes
-	 where id in (select nid from cards where did in {ids2str(dids)}))) order by ntid, ord
-"""
-            )
-
-        def _on_done(fut: Future) -> None:
-            try:
-                fut.result()
-            finally:
-                self.mw.progress.finish()
-            self.form.copyFromListWidget.clear()
-            self.form.copyFromListWidget.addItems(self.dest_fields)
-            self.form.searchInFieldComboBox.clear()
-            self.form.searchInFieldComboBox.addItems(self.dest_fields)
-            if on_done:
-                on_done()
-
-        self.mw.taskman.run_in_background(task, on_done=_on_done)
+        if mid:
+            model = self.mw.col.models.get(mid)
+            for field in model["flds"]:
+                self.dest_fields.append(field["name"])
+        self.form.copyFromListWidget.clear()
+        self.form.copyFromListWidget.addItems(self.dest_fields)
+        self.form.searchInFieldComboBox.clear()
+        self.form.searchInFieldComboBox.addItems(self.dest_fields)
 
     def _process_notes(
         self,
-        deck: str,
+        notetype: str,
         search_field: str,
         copy_into_field: str,
         search_in_field: str,
@@ -200,7 +161,7 @@ select distinct name from fields
                 )
             copied, _ = get_related_content(
                 note,
-                deck,
+                notetype,
                 search_field,
                 search_in_field,
                 copy_from_fields,
@@ -216,7 +177,7 @@ select distinct name from fields
         copy_into_field = self.src_fields[
             self.form.copyIntoFieldComboBox.currentIndex()
         ]
-        deck = self.deck_chooser.selected_deck_name()
+        notetype = self.notetype_chooser.selected_notetype_name()
         search_in_field = (
             self.dest_fields[self.form.searchInFieldComboBox.currentIndex()]
             if self.form.searchInFieldCheckBox.isChecked()
@@ -236,7 +197,7 @@ select distinct name from fields
         # save options
         self.config["search_field"] = search_field
         self.config["copy_into_field"] = copy_into_field
-        self.config["copy_from_deck"] = deck
+        self.config["copy_from_notetype"] = notetype
         self.config["search_in_field"] = search_in_field
         self.config["copy_from_fields"] = copy_from_fields
         self.config["matched_notes_limit"] = max_notes
@@ -259,7 +220,7 @@ select distinct name from fields
         self.mw.progress.set_title(consts.ADDON_NAME)
         self.mw.taskman.run_in_background(
             lambda: self._process_notes(
-                deck,
+                notetype,
                 search_field,
                 copy_into_field,
                 search_in_field,

@@ -19,6 +19,8 @@ disable=
   too-many-locals,
   attribute-defined-outside-init,
   too-many-instance-attributes,
+  global-statement,
+  bare-except,
 
 [BASIC]
 good-names =

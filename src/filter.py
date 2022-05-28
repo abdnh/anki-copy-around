@@ -108,7 +108,7 @@ def add_filter(
         value = pair["value"].strip('"')
         options[key] = value
 
-    deck = options.get("deck", "")
+    notetype_name = options.get("notetype", "Basic")
     search_in = options.get("search_in", "")
     leech_from = options["leech_from"].split(",")
     count = int(options.get("count", 1))
@@ -132,7 +132,7 @@ def add_filter(
         data = dict(
             toggle_id=filter_id,
             cid=ctx.card().id,
-            deck=deck,
+            notetype_name=notetype_name,
             search_field=field_name,
             search_in_field=search_in,
             copy_from_fields=leech_from,
@@ -162,7 +162,7 @@ def add_filter(
             other_col = mw.copyaround_colman.col
         ret, rel = get_related_content(
             ctx.note(),
-            deck,
+            notetype_name,
             field_name,
             search_in,
             leech_from,

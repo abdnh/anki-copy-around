@@ -1,17 +1,10 @@
+import os
 import random
 import re
+import shutil
+import unicodedata
 from dataclasses import dataclass
-from typing import (
-    Dict,
-    Iterable,
-    List,
-    Match,
-    MutableSequence,
-    Optional,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import Any, Dict, List, Match, MutableSequence, Optional, Tuple, Union, cast
 
 from anki.cards import Card
 from anki.collection import Collection, SearchNode
@@ -72,12 +65,161 @@ class SaveInfo:
     filter_id: int
 
 
+# ported from rslib/src/text.rs
+WILDCARD_RE = re.compile(r"\\[\\*]|[*%]")
+
+
+def to_sql(txt: str) -> str:
+    def repl(match: Match) -> str:
+        s = match.group(0)
+        if s == r"\\":
+            return r"\\"
+        if s == r"\*":
+            return "*"
+        if s == "*":
+            return "%"
+        if s == "%":
+            return r"\%"
+        return s
+
+    return WILDCARD_RE.sub(repl, txt)
+
+
+SQL_RE = re.compile(r"[\\%_]")
+
+
+def escape_sql_wildcards(txt: str) -> str:
+    return SQL_RE.sub(r"\\\0", txt)
+
+
 def get_related(
+    note: Note,
+    notetype_name: str,
+    search_field: str,
+    search_in_field: str,
+    copy_from_fields: List[str],
+    max_notes: int = -1,
+    shuffle: bool = False,
+    subs2srs_info: Optional[Subs2srsOptions] = None,
+    other_col: Optional[Collection] = None,
+) -> Tuple[str, CopyAroundRelated]:
+
+    copyaround = CopyAroundRelated(note.id, {})
+    if other_col:
+        col = other_col
+    else:
+        col = mw.col
+    notetype = col.models.by_name(notetype_name)
+    mid = notetype["id"]
+    field_ords = {}
+    for f in notetype["flds"]:
+        field_ords[f["name"]] = f["ord"]
+    search_text = stripHTML(note[search_field])
+    search_text = unicodedata.normalize("NFC", search_text)
+    escaped_search = to_sql(search_text)
+    where_params: List[Any] = []
+    field_params: List[Any] = []
+    if search_in_field:
+        if search_in_field not in field_ords:
+            return search_text, copyaround
+        where_clause = "field_at_index(n.flds, ?) like '%' || ? || '%' escape '\\'"
+        where_params.append(field_ords[search_in_field])
+        where_params.append(escaped_search)
+    else:
+        where_clause = "(sfld like '%' || ? || '%' escape '\\' or flds like '%' || ? || '%' escape '\\')"
+        where_params.append(escaped_search)
+        where_params.append(escaped_search)
+    where_clause += " and n.id != ? and n.mid = ?"
+    where_params.append(note.id)
+    where_params.append(mid)
+    subqueries = []
+    for i, field in enumerate(copy_from_fields):
+        subqueries.append(f"f{i} != ''")
+
+    where_clause += f' and ({" or ".join(subqueries)})'
+    query = "select n.id, {field_subquery} from notes n where {where_clause}"
+    subqueries = []
+    for i, field in enumerate(copy_from_fields):
+        if field in field_ords:
+            subqueries.append(f"field_at_index(n.flds, ?) as f{i}")
+            field_params.append(field_ords[field])
+    if not subqueries:
+        # no requested fields exist in target notetype
+        return search_text, copyaround
+
+    query = query.format(
+        field_subquery=", ".join(subqueries), where_clause=where_clause
+    )
+    params = field_params + where_params
+    # print(
+    #     f"copyaround: {query=} {search_text=} {escaped_search=} {params=} {other_col=}"
+    # )
+    results_list = col.db.all(query, *params)
+    # print(f"{results_list=}")
+    if shuffle:
+        random.shuffle(results_list)
+    if max_notes >= 0:
+        results_list = results_list[:max_notes]
+    for nid, *field_contents in results_list:
+        dest_note: Dict[str, str] = {}
+        for i, val in enumerate(field_contents):
+            if val:
+                dest_note[copy_from_fields[i]] = val
+        copied_fields = {}
+        subs2srs_text = ""
+        raw_subs2srs_text = ""
+        for copy_from_field in copy_from_fields:
+            if copy_from_field in dest_note:
+                contents = dest_note[copy_from_field]
+                if other_col:
+                    # UGLY HACK: copy media files from the other collection to the current collection
+                    # FIXME: find a better way to do this
+                    filenames = col.media.filesInStr(mid, contents)
+                    for filename in filenames:
+                        shutil.copy(
+                            os.path.join(
+                                os.path.dirname(col.path), "collection.media", filename
+                            ),
+                            mw.col.media.dir(),
+                        )
+                copied_fields[copy_from_field] = RelatedField(
+                    copy_from_field, contents, contents
+                )
+        if subs2srs_info and (
+            subs2srs_context := getattr(mw, "subs2srs_context", None)
+        ):
+            # get info from previous and next sub2srs notes using the subs2srs-context add-on
+            # TODO: maybe factor out some of this logic to subs2srs-context
+            audio_buttons = subs2srs_context.get_audio_buttons(nid, flip=True)
+            audio_filenames = [
+                subs2srs_context.get_audio_filename(nid - 1),
+                subs2srs_context.get_audio_filename(nid + 1),
+            ]
+            audio_tags = [
+                f"[sound:{filename}]" if filename else ""
+                for filename in audio_filenames
+            ]
+            expressions = subs2srs_context.get_expressions(nid)
+            subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_buttons[0]}{audio_buttons[1]}{expressions[1]}</div>'
+            if subs2srs_info.save:
+                raw_subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_tags[0]}{audio_tags[1]}{expressions[1]}</div>'
+
+        if copied_fields:
+            related_note = RelatedNote(
+                nid, copied_fields, subs2srs_text, raw_subs2srs_text
+            )
+            copyaround.related_notes[nid] = related_note
+
+    return search_text, copyaround
+
+
+# TODO: remove this
+def get_related_old(
     note: Note,
     deck: str,
     search_field: str,
     search_in_field: str,
-    copy_from_fields: Iterable[str],
+    copy_from_fields: List[str],
     max_notes: int = -1,
     shuffle: bool = False,
     subs2srs_info: Optional[Subs2srsOptions] = None,
@@ -180,10 +322,10 @@ def format_note_for_saving(note: RelatedNote) -> str:
 
 def get_related_content(
     note: Note,
-    deck: str,
+    notetype_name: str,
     search_field: str,
     search_in_field: str,
-    copy_from_fields: Iterable[str],
+    copy_from_fields: List[str],
     max_notes: int = -1,
     shuffle: bool = False,
     highlight: bool = False,
@@ -195,9 +337,12 @@ def get_related_content(
     save_info: Optional[SaveInfo] = None,
     other_col: Optional[Collection] = None,
 ) -> Tuple[str, CopyAroundRelated]:
+
+    # benchmark()
+
     search_text, copyaround = get_related(
         note,
-        deck,
+        notetype_name,
         search_field,
         search_in_field,
         copy_from_fields,
@@ -230,7 +375,7 @@ def get_related_content(
                 # We need to process audio filenames manually in the delayed=true case
                 # because Anki's processing of them will have finished at this stage.
                 # I use my control-audio-playback add-on here.
-                processed_contents, tags = playback_controller.add_sound_tags_from_text(
+                processed_contents, _ = playback_controller.add_sound_tags_from_text(
                     processed_contents,
                     "q" if side == "question" else "a",
                     card and card.autoplay(),
@@ -251,3 +396,85 @@ def get_related_content(
             copied += format_note(related.nid, copied_fields)
 
     return copied, copyaround
+
+
+def benchmark() -> None:
+    from timeit import timeit
+
+    words = [
+        "不良少年",
+        "注定",
+        "占便宜",
+        "没的说",
+        "节骨眼儿",
+        "纳闷儿",
+        "郎才女貌",
+        "划不来",
+        "悠着",
+        "心血",
+        "一无所获",
+        "一语成谶",
+        "不巧的",
+        "悬念",
+        "马大哈",
+        "入关",
+        "鬼地方",
+        "断片",
+        "心里有数",
+        "非分",
+        "分手费",
+        "面都没",
+        "负责到底",
+        "不修哪里幅",
+        "熟悉感",
+        "划清界限",
+        "替他",
+        "恶性竞争",
+        "坏我好事",
+        "老派",
+        "铲屎官",
+        "入手了",
+        "多得多",
+        "一晚上",
+        "保证你",
+        "老大不小",
+        "以下几点",
+        "长胖",
+        "扯着",
+        "图什么",
+        "生我气",
+        "人家属",
+        "会时刻",
+        "难道说",
+        "凑什么",
+        "中等偏上",
+    ]
+    tl1 = []
+    tl2 = []
+    args = [
+        "Word",
+        "Expression",
+        ["Expression", "Audio"],
+        2,
+        True,
+        Subs2srsOptions(font_size="12", save=False),
+        None,
+    ]
+
+    class DummyNote(dict):
+        id = 1
+
+    for word in words:
+        nt = cast(Note, DummyNote(Word=word))
+        t1 = timeit(
+            lambda nt=nt: get_related_old(nt, "bulk", *args),
+            number=1,
+        )
+        t2 = timeit(
+            lambda nt=nt: get_related(nt, "subs2srs", *args),
+            number=1,
+        )
+        tl1.append(t1)
+        tl2.append(t2)
+        print(f"{t1=} {t2=}")
+    print("Average: t1={} , t2={}".format(sum(tl1) / len(words), sum(tl2) / len(words)))

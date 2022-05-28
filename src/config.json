@@ -3,7 +3,7 @@
     "editor_shortcut": "",
     "search_field": "word",
     "copy_into_field": "text_vocal",
-    "copy_from_deck": "Deck 2",
+    "copy_from_notetype": "subs2srs",
     "search_in_field": "Expression",
     "copy_from_fields": ["Snapshot"],
     "matched_notes_limit": -1,
