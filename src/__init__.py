@@ -1,6 +1,6 @@
 import os
 
-import anki
+import aqt
 from aqt import gui_hooks, mw
 
 from . import consts
@@ -9,7 +9,7 @@ from .collection_manager import CollectionManager
 from .filter import init_filter
 
 collection_manager = CollectionManager()
-ANKI_VERSION = tuple(int(p) for p in anki.version.split("."))  # type: ignore
+ANKI_VERSION = tuple(int(p) for p in aqt.appVersion.split("."))
 
 
 def open_other_col() -> None:
