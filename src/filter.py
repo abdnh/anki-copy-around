@@ -250,7 +250,8 @@ def save_related_note(nid: str, filter_id: int, save_field: str) -> None:
     related_note = FILTER_CONTEXT[filter_id].related_notes[NoteId(int(nid))]
     note[save_field] += format_note_for_saving(related_note)
     tooltip(f'Added content from note {nid} to field "{save_field}"')
-    note.flush()
+    if note.id:
+        note.flush()
     if context.editor:
         context.editor.set_note(note)
 
