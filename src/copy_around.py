@@ -92,6 +92,21 @@ def escape_sql_wildcards(txt: str) -> str:
     return SQL_RE.sub(r"\\\0", txt)
 
 
+def copy_to_current_col(other_col: Collection, filename: str):
+    dest_file = os.path.join(mw.col.media.dir(), filename)
+    if not os.path.exists(dest_file):
+        try:
+            shutil.copy(
+                os.path.join(
+                    other_col.media.dir(),
+                    filename,
+                ),
+                dest_file,
+            )
+        except FileNotFoundError:
+            pass
+
+
 def get_related(
     note: Note,
     notetype_name: str,
@@ -178,18 +193,7 @@ def get_related(
                     # FIXME: find a better way to do this
                     filenames = col.media.filesInStr(mid, contents)
                     for filename in filenames:
-                        dest_file = os.path.join(mw.col.media.dir(), filename)
-                        if not os.path.exists(dest_file):
-                            try:
-                                shutil.copy(
-                                    os.path.join(
-                                        col.media.dir(),
-                                        filename,
-                                    ),
-                                    dest_file,
-                                )
-                            except FileNotFoundError:
-                                pass
+                        copy_to_current_col(col, filename)
                 copied_fields[copy_from_field] = RelatedField(
                     copy_from_field, contents, contents
                 )
@@ -203,6 +207,8 @@ def get_related(
                 subs2srs_context.get_audio_filename(nid - 1),
                 subs2srs_context.get_audio_filename(nid + 1),
             ]
+            for filename in audio_filenames:
+                copy_to_current_col(col, filename)
             audio_tags = [
                 f"[sound:{filename}]" if filename else ""
                 for filename in audio_filenames
