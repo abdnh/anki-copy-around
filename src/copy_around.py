@@ -183,8 +183,7 @@ def get_related(
                             try:
                                 shutil.copy(
                                     os.path.join(
-                                        os.path.dirname(col.path),
-                                        "collection.media",
+                                        col.media.dir(),
                                         filename,
                                     ),
                                     dest_file,

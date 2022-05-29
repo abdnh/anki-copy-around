@@ -1,7 +1,6 @@
 from concurrent.futures import Future
 from typing import List, Optional, Tuple
 
-import anki
 from anki.models import NotetypeId
 from anki.notes import Note
 from aqt import qtmajor
@@ -17,9 +16,6 @@ if qtmajor > 5:
     from .forms.form_qt6 import Ui_Dialog
 else:
     from .forms.form_qt5 import Ui_Dialog  # type: ignore
-
-
-ANKI_POINT_VERSION = int(anki.version.split(".")[-1])  # type: ignore
 
 
 PROGRESS_LABEL = "Processed {count} out of {total} note(s)"
