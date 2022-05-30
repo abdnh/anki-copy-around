@@ -202,10 +202,10 @@ def get_related(
         ):
             # get info from previous and next sub2srs notes using the subs2srs-context add-on
             # TODO: maybe factor out some of this logic to subs2srs-context
-            audio_buttons = subs2srs_context.get_audio_buttons(nid, flip=True)
+            audio_buttons = subs2srs_context.get_audio_buttons(nid, flip=True, col=col)
             audio_filenames = [
-                subs2srs_context.get_audio_filename(nid - 1),
-                subs2srs_context.get_audio_filename(nid + 1),
+                subs2srs_context.get_audio_filename(nid - 1, col=col),
+                subs2srs_context.get_audio_filename(nid + 1, col=col),
             ]
             for filename in audio_filenames:
                 copy_to_current_col(col, filename)
@@ -213,7 +213,7 @@ def get_related(
                 f"[sound:{filename}]" if filename else ""
                 for filename in audio_filenames
             ]
-            expressions = subs2srs_context.get_expressions(nid)
+            expressions = subs2srs_context.get_expressions(nid, col=col)
             subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_buttons[0]}{audio_buttons[1]}{expressions[1]}</div>'
             if subs2srs_info.save:
                 raw_subs2srs_text += f'<div class="copyaround-subs2srs-context" style="font-size: {subs2srs_info.font_size};">{expressions[0]}{audio_tags[0]}{audio_tags[1]}{expressions[1]}</div>'
