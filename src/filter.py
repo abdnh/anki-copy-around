@@ -55,6 +55,7 @@ def get_active_card_view_context() -> CardViewContext:
         card_ord = dialog.ord
         note = dialog.note
         web = dialog.preview_web
+        # TODO: how to get the editor's instance here?
         editor = None
     elif isinstance(window, Previewer):
         side = window._state  # pylint: disable=protected-access
